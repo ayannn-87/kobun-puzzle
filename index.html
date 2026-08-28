@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<!-- スマホでも見やすいようにビューポートを設定 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>活用ネオン ― 古文助動詞パズル</title>
+
+<!-- Googleフォント読み込み：見出し用(Dela Gothic One) / 本文用(Zen Kaku Gothic New) / 数字用(Orbitron) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 桜の花びらエフェクト用の入れ物。中身はJavaScriptが自動生成する -->
+<div id="sakura-layer" aria-hidden="true"></div>
+
+<div id="app">
+
+  <!-- ============================== -->
+  <!-- ① タイトル画面（難易度選択）      -->
+  <!-- ============================== -->
+  <section id="screen-title" class="screen is-active">
+    <div class="title-panel">
+      <p class="eyebrow">CYBER × 和風 学習パズル</p>
+      <h1 class="game-logo">活用<span>ネオン</span></h1>
+      <p class="game-sub">シャッフルされた活用語を並べ替えて、古文助動詞の活用表を光らせろ。</p>
+
+      <div class="difficulty-select">
+        <button class="diff-btn" data-difficulty="beginner">
+          <span class="diff-name">初級</span>
+          <span class="diff-desc">色ヒントあり</span>
+        </button>
+        <button class="diff-btn" data-difficulty="intermediate">
+          <span class="diff-name">中級</span>
+          <span class="diff-desc">色ヒント弱め・タイマー表示</span>
+        </button>
+        <button class="diff-btn" data-difficulty="advanced">
+          <span class="diff-name">上級</span>
+          <span class="diff-desc">色ヒントなし・ダミーマス混入</span>
+        </button>
+      </div>
+
+      <p class="rule-hint">マスをタップ（クリック）して2つ選ぶと入れ替わります。ドラッグ＆ドロップにも対応。</p>
+    </div>
+  </section>
+
+  <!-- ============================== -->
+  <!-- ② ゲーム画面                     -->
+  <!-- ============================== -->
+  <section id="screen-game" class="screen">
+    <header class="game-header">
+      <button id="btn-back-title" class="ghost-btn" aria-label="タイトルへ戻る">← タイトル</button>
+
+      <div class="hud">
+        <div class="hud-item">
+          <span class="hud-label">SCORE</span>
+          <span class="hud-value" id="hud-score">0</span>
+        </div>
+        <div class="hud-item" id="hud-combo-wrap">
+          <span class="hud-label">COMBO</span>
+          <span class="hud-value" id="hud-combo">0</span>
+        </div>
+        <div class="hud-item" id="hud-timer-wrap">
+          <span class="hud-label">TIME</span>
+          <span class="hud-value" id="hud-timer">00:00</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">完成</span>
+          <span class="hud-value"><span id="hud-cleared">0</span>/6</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 色ヒントの凡例（難易度によって表示/非表示を切り替える） -->
+    <div id="hint-legend" class="hint-legend"></div>
+
+    <!-- 盤面本体：列見出し＋マスのグリッド -->
+    <div class="board-wrap">
+      <div id="board" class="board"></div>
+    </div>
+
+    <p id="toast" class="toast" aria-live="polite"></p>
+  </section>
+
+  <!-- ============================== -->
+  <!-- ③ クリア画面（オーバーレイ）       -->
+  <!-- ============================== -->
+  <section id="screen-clear" class="screen">
+    <div class="clear-panel">
+      <p class="clear-eyebrow">ALL COMPLETE</p>
+      <h2 class="clear-title">活用表完成！</h2>
+
+      <div class="clear-rank" id="clear-rank">S</div>
+
+      <dl class="clear-stats">
+        <div class="clear-stat">
+          <dt>クリアタイム</dt>
+          <dd id="clear-time">00:00</dd>
+        </div>
+        <div class="clear-stat">
+          <dt>総スコア</dt>
+          <dd id="clear-score">0</dd>
+        </div>
+        <div class="clear-stat">
+          <dt>完成行数</dt>
+          <dd id="clear-rows">6 / 6</dd>
+        </div>
+      </dl>
+
+      <div class="clear-buttons">
+        <button id="btn-retry" class="neon-btn">もう一度遊ぶ</button>
+        <button id="btn-to-title" class="ghost-btn">タイトルへ戻る</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
