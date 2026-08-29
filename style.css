@@ -22,15 +22,15 @@
   --text-sub: #a292c4;
 
   /* ---- 活用グループごとのヒントカラー ---- */
-  --grp-ki: #4d8dff;      /* き系   → 青   */
-  --grp-keri: #c86bff;    /* けり系 → 紫   */
-  --grp-zu: #ff4d6d;      /* ず系   → 赤   */
-  --grp-mu: #47ff9c;      /* む系   → 緑   */
-  --grp-tari: #ffd166;    /* たり系 → 金   */
-  --grp-kaku: #5be3ff;    /* 書く系 → 水色 */
-  --grp-dummy: #5a5470;   /* ダミー → 無彩色 */
+--grp-blue:   #3b82f6; /* 青 */
+--grp-purple: #a855f7; /* 紫 */
+--grp-red:    #ef4444; /* 赤 */
+--grp-green:  #22c55e; /* 緑 */
+--grp-yellow: #eab308; /* 黄 */
+--grp-cyan:   #06b6d4; /* 水色 */
+--grp-dummy: #5a5470;
 
-  --radius: 14px;
+--radius: 14px;
 }
 
 *{ box-sizing: border-box; }
@@ -452,6 +452,12 @@ button{ font-family: inherit; }
   .game-header{ justify-content:center; }
   .board{ gap: 4px; }
 }
+
+/* 動きを抑えたい設定のユーザーへの配慮 */
+@media (prefers-reduced-motion: reduce){
+  .petal, .cell, .neon-btn, .clear-panel, .toast{ animation: none !important; transition: none !important; }
+}
+
 
 /* 動きを抑えたい設定のユーザーへの配慮 */
 @media (prefers-reduced-motion: reduce){
