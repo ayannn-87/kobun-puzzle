@@ -17,19 +17,63 @@
 // 活用形の列名（常に左からこの順番で表示する）
 const KEI_LABELS = ["未然形", "連用形", "終止形", "連体形", "已然形", "命令形"];
 
-// 6種類の活用表データ。forms は [未然,連用,終止,連体,已然,命令] の順。
-// color はヒント機能で使う「グループカラー」のCSS変数名に対応させるキー。
-const PATTERNS = [
-  { id: "ki",   name: "過去の助動詞「き」",   colorVar: "--grp-ki",   forms: ["せ", "○", "き", "し", "しか", "○"] },
-  { id: "keri", name: "詠嘆の助動詞「けり」", colorVar: "--grp-keri", forms: ["○", "○", "けり", "ける", "けれ", "○"] },
-  { id: "zu",   name: "打消の助動詞「ず」",   colorVar: "--grp-zu",   forms: ["ず", "ず", "ず", "ぬ", "ね", "ざれ"] },
-  { id: "mu",   name: "推量の助動詞「む」",   colorVar: "--grp-mu",   forms: ["○", "○", "む", "む", "め", "○"] },
-  { id: "tari", name: "完了の助動詞「たり」", colorVar: "--grp-tari", forms: ["たら", "たり", "たり", "たる", "たれ", "たれ"] },
-  { id: "kaku", name: "四段活用「書く」",     colorVar: "--grp-kaku", forms: ["か", "き", "く", "く", "け", "け"] },
+// 色ヒントに使うグループカラー（CSS変数名）。今のところ6色しか用意していないため、
+// PATTERNSの数がそれより多くても表示が壊れないよう、順番に使い回す(cycleさせる)。
+const GROUP_COLOR_VARS = [
+  "--grp-blue",
+  "--grp-purple",
+  "--grp-red",
+  "--grp-green",
+  "--grp-yellow",
+  "--grp-cyan",
 ];
 
+
+
+// ---------------------------------------------------------------------
+// 全助動詞（＋動詞活用の例）データベース。
+// ここに何種類登録してもよい（20種類以上になっても動作する設計）。
+// forms は [未然,連用,終止,連体,已然,命令] の順。存在しない活用形は "○"。
+// colorVar は GROUP_COLOR_VARS を順番に割り当てているだけなので、
+// 件数が増えても自動的に使い回される。
+// ---------------------------------------------------------------------
+const PATTERN_SOURCE = [
+  { id: "ki",         name: "過去の助動詞「き」",         forms: ["せ", "○", "き", "し", "しか", "○"] },
+  { id: "keri",       name: "詠嘆の助動詞「けり」",       forms: ["○", "○", "けり", "ける", "けれ", "○"] },
+  { id: "zu",         name: "打消の助動詞「ず」",         forms: ["ず", "ず", "ず", "ぬ", "ね", "ざれ"] },
+  { id: "mu",         name: "推量の助動詞「む」",         forms: ["○", "○", "む", "む", "め", "○"] },
+  { id: "tari-kanryo",name: "完了の助動詞「たり」",       forms: ["たら", "たり", "たり", "たる", "たれ", "たれ"] },
+  { id: "kaku",       name: "四段活用「書く」",           forms: ["か", "き", "く", "く", "け", "け"] },
+  { id: "tsu",        name: "完了の助動詞「つ」",         forms: ["て", "て", "つ", "つる", "つれ", "てよ"] },
+  { id: "nu-kanryo",  name: "完了の助動詞「ぬ」",         forms: ["な", "に", "ぬ", "ぬる", "ぬれ", "ね"] },
+  { id: "kemu",       name: "過去推量の助動詞「けむ」",   forms: ["○", "○", "けむ", "けむ", "けめ", "○"] },
+  { id: "ramu",       name: "現在推量の助動詞「らむ」",   forms: ["○", "○", "らむ", "らむ", "らめ", "○"] },
+  { id: "beshi",      name: "推量の助動詞「べし」",       forms: ["べく", "べく", "べし", "べき", "べけれ", "○"] },
+  { id: "maji",       name: "打消推量の助動詞「まじ」",   forms: ["まじく", "まじく", "まじ", "まじき", "まじけれ", "○"] },
+  { id: "mashi",      name: "反実仮想の助動詞「まし」",   forms: ["ませ", "○", "まし", "まし", "ましか", "○"] },
+  { id: "meri",       name: "推定の助動詞「めり」",       forms: ["○", "めり", "めり", "める", "めれ", "○"] },
+  { id: "nari-denbun",name: "伝聞推定の助動詞「なり」",   forms: ["○", "なり", "なり", "なる", "なれ", "○"] },
+  { id: "nari-dantei",name: "断定の助動詞「なり」",       forms: ["なら", "なり", "なり", "なる", "なれ", "なれ"] },
+  { id: "gotoshi",    name: "比況の助動詞「ごとし」",     forms: ["ごとく", "ごとく", "ごとし", "ごとき", "○", "○"] },
+  { id: "tashi",      name: "希望の助動詞「たし」",       forms: ["たく", "たく", "たし", "たき", "たけれ", "○"] },
+  { id: "ru-jido",    name: "受身・自発の助動詞「る」",   forms: ["れ", "れ", "る", "るる", "るれ", "れよ"] },
+  { id: "sasu-shieki",name: "使役の助動詞「さす」",       forms: ["させ", "させ", "さす", "さする", "さすれ", "させよ"] },
+];
+
+// colorVar をここで自動的に割り当てる（PATTERN_SOURCEの並び順に対してcycleする）
+const PATTERNS = PATTERN_SOURCE;
+
+// 1回のゲームで出題するパターン数（この数を変えるだけで出題数を増減できる）
+const PATTERN_SELECT_COUNT = 6;
+
+// pool の中からランダムに count 件、重複なしで抽出する。
+// シャッフルしてから先頭count件を取るだけなので、poolに同じidが無い限り重複しない。
+function getRandomPatterns(pool, count) {
+  return shuffleArray(pool).slice(0, count);
+}
+
 // 上級モードで混ぜるダミー語（どの活用表にも属さない偽物）
-const DUMMY_WORDS = ["べし", "らむ", "まし", "なり", "り", "ぬ"];
+const DUMMY_WORDS = ["すら", "のみ", "こそ", "しも", "だに", "や"];
 
 /* ------------------------------------------------------------------------
    2. ゲーム状態
@@ -37,7 +81,8 @@ const DUMMY_WORDS = ["べし", "らむ", "まし", "なり", "り", "ぬ"];
 
 const state = {
   difficulty: "beginner", // beginner / intermediate / advanced
-  rows: 6,                // 盤面の行数（上級はダミー行が1行増える）
+  selectedPatterns: [],   // 今回の出題で選ばれたパターン（ランダムにPATTERN_SELECT_COUNT件）
+  rows: 6,                // 盤面の行数（selectedPatterns.length + 上級ならダミー行1行）
   cols: 6,
   cells: [],              // 盤面上の各マスのデータ（行優先の1次元配列）
   selectedIndex: null,    // クリック選択中のマスのインデックス
@@ -106,11 +151,12 @@ function showToast(text) {
    4. 盤面生成
    ------------------------------------------------------------------------ */
 
-function buildDeck(difficulty) {
+function buildDeck(difficulty, selectedPatterns) {
   const deck = [];
 
-  // 6種類×6マス＝36マス分の「正解セット」を用意する
-  PATTERNS.forEach((pattern, rowIndex) => {
+  // 出題対象として選ばれたパターンの分だけ「正解セット」を用意する
+  // （選ばれた種類数 × 6マス）
+  selectedPatterns.forEach((pattern, rowIndex) => {
     pattern.forms.forEach((value, colIndex) => {
       deck.push({
         value,
@@ -141,8 +187,21 @@ function buildDeck(difficulty) {
 }
 
 function startGame(difficulty) {
+  // PATTERNS（全助動詞データ）からランダムにPATTERN_SELECT_COUNT種類、重複なしで抽出する
+  // ここが要件のコア部分：
+  //   const selectedPatterns = getRandomPatterns(PATTERNS, 6);
+ const selectedPatterns =
+  getRandomPatterns(PATTERNS, PATTERN_SELECT_COUNT)
+    .map((pattern, index) => ({
+      ...pattern,
+      colorVar: GROUP_COLOR_VARS[index]
+    }));
+
   state.difficulty = difficulty;
-  state.rows = difficulty === "advanced" ? 7 : 6; // ダミー行の分だけ1行増える
+  state.selectedPatterns = selectedPatterns;
+  // 出題数(selectedPatterns.length)を基準に行数を決める。
+  // → 将来PATTERN_SELECT_COUNTを増減させても、この行はそのまま動作する。
+  state.rows = selectedPatterns.length + (difficulty === "advanced" ? 1 : 0);
   state.cols = 6;
   state.selectedIndex = null;
   state.lockedPatternIds = new Set();
@@ -155,8 +214,8 @@ function startGame(difficulty) {
   // タイトル非表示→ゲーム表示 → 盤面シャッフル生成 → タイマー開始
   showScreen("screen-game");
 
-  // シャッフルしたデッキを盤面マスへ割り当てる
-  const shuffled = shuffleArray(buildDeck(difficulty));
+  // シャッフルしたデッキを盤面マスへ割り当てる（選ばれたパターンのみで生成）
+  const shuffled = shuffleArray(buildDeck(difficulty, selectedPatterns));
   state.cells = shuffled.map((data) => ({ ...data, locked: false }));
 
   updateHUD();
@@ -242,7 +301,8 @@ function renderHintLegend() {
   }
   legend.classList.remove("is-hidden");
 
-  PATTERNS.forEach((pattern) => {
+  // 凡例には「今回選ばれた6種類」だけを表示する
+  state.selectedPatterns.forEach((pattern) => {
     const item = document.createElement("span");
     item.className = "legend-item";
     const dot = document.createElement("span");
@@ -341,18 +401,20 @@ function swapCells(indexA, indexB) {
   updateHUD();
   renderBoard();
 
-  if (state.lockedPatternIds.size >= PATTERNS.length) {
+  // クリア条件は「PATTERNS全件」ではなく「今回選ばれたselectedPatterns」を完成させること
+  if (state.lockedPatternIds.size >= state.selectedPatterns.length) {
     finishGame();
   }
 }
 
-// 指定した行が、まだロックされていない完成パターンと完全一致するか判定する
+// 指定した行が、まだロックされていない完成パターンと完全一致するか判定する。
+// 判定対象は state.selectedPatterns（今回抽出された6種類）のみに限定する。
 function checkRowCompletion(row) {
   const start = row * state.cols;
   const rowCells = state.cells.slice(start, start + state.cols);
 
   const values = rowCells.map((c) => c.value);
-  const matched = PATTERNS.find(
+  const matched = state.selectedPatterns.find(
     (p) => !state.lockedPatternIds.has(p.id) && p.forms.every((v, i) => v === values[i])
   );
   return matched || null;
@@ -430,7 +492,7 @@ function finishGame() {
   const finalSeconds = state.elapsedSeconds;
   document.getElementById("clear-time").textContent = formatTime(finalSeconds);
   document.getElementById("clear-score").textContent = state.score;
-  document.getElementById("clear-rows").textContent = `${state.lockedPatternIds.size} / 6`;
+  document.getElementById("clear-rows").textContent = `${state.lockedPatternIds.size} / ${state.selectedPatterns.length}`;
   document.getElementById("clear-rank").textContent = calcRank(finalSeconds);
 
   // 少し余韻を持たせてからクリア画面を表示
