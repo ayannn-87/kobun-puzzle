@@ -1,13 +1,14 @@
 /* ==========================================================================
-   活用ネオン ― 古文助動詞活用表パズル
+   月灯りの活用帳 ― 古文助動詞活用表パズル
    script.js
 
    ここでは以下を行っています。
-   1. 活用表データ（6種類）とダミー語の定義
-   2. 盤面のシャッフル生成
-   3. クリック（タップ）／ドラッグ＆ドロップによるマス入れ替え
-   4. 行ごとの正誤判定・ロック演出
+   1. 助動詞データベース（20種類以上）とダミー語の定義
+   2. 出題パターンのランダム抽出・盤面のシャッフル生成
+   3. クリック（タップ）／マウスドラッグ／指でのタッチドラッグによるマス入れ替え
+   4. 行ごとの正誤判定・ロック演出（行灯の光で浮かび上がる演出）
    5. スコア・コンボ・タイマー・クリア判定
+   6. 初級モード限定の「学習メモ」モーダル表示
    ========================================================================== */
 
 /* ------------------------------------------------------------------------
@@ -17,9 +18,10 @@
 // 活用形の列名（常に左からこの順番で表示する）
 const KEI_LABELS = ["未然形", "連用形", "終止形", "連体形", "已然形", "命令形"];
 
-// 色ヒントに使うグループカラー（CSS変数名）。今のところ6色しか用意していないため、
-// PATTERNSの数がそれより多くても表示が壊れないよう、順番に使い回す(cycleさせる)。
-const GROUP_COLOR_VARS = [
+// 出題された6種類に対して「1番目=青,2番目=紫,3番目=赤,4番目=緑,5番目=黄,6番目=水色」を
+// 助動詞の種類に関わらず毎回固定で割り当てるための色リスト（CSS変数名）。
+// 助動詞ID(patternId)には一切紐づけない＝ここが今回の修正の核心。
+const ROW_COLOR_VARS = [
   "--grp-blue",
   "--grp-purple",
   "--grp-red",
@@ -34,33 +36,34 @@ const GROUP_COLOR_VARS = [
 // 全助動詞（＋動詞活用の例）データベース。
 // ここに何種類登録してもよい（20種類以上になっても動作する設計）。
 // forms は [未然,連用,終止,連体,已然,命令] の順。存在しない活用形は "○"。
-// colorVar は GROUP_COLOR_VARS を順番に割り当てているだけなので、
-// 件数が増えても自動的に使い回される。
+// meaning（意味）・connection（接続）は初級モードの学習メモで使用する。
+// なお色(colorVar)はここでは持たせない。出題順（何番目に選ばれたか）だけで
+// 「青・紫・赤・緑・黄・水色」を割り当てるため、buildDeck() 側で決定する。
 // ---------------------------------------------------------------------
 const PATTERN_SOURCE = [
-  { id: "ki",         name: "過去の助動詞「き」",         forms: ["せ", "○", "き", "し", "しか", "○"] },
-  { id: "keri",       name: "詠嘆の助動詞「けり」",       forms: ["○", "○", "けり", "ける", "けれ", "○"] },
-  { id: "zu",         name: "打消の助動詞「ず」",         forms: ["ず", "ず", "ず", "ぬ", "ね", "ざれ"] },
-  { id: "mu",         name: "推量の助動詞「む」",         forms: ["○", "○", "む", "む", "め", "○"] },
-  { id: "tari-kanryo",name: "完了の助動詞「たり」",       forms: ["たら", "たり", "たり", "たる", "たれ", "たれ"] },
-  { id: "kaku",       name: "四段活用「書く」",           forms: ["か", "き", "く", "く", "け", "け"] },
-  { id: "tsu",        name: "完了の助動詞「つ」",         forms: ["て", "て", "つ", "つる", "つれ", "てよ"] },
-  { id: "nu-kanryo",  name: "完了の助動詞「ぬ」",         forms: ["な", "に", "ぬ", "ぬる", "ぬれ", "ね"] },
-  { id: "kemu",       name: "過去推量の助動詞「けむ」",   forms: ["○", "○", "けむ", "けむ", "けめ", "○"] },
-  { id: "ramu",       name: "現在推量の助動詞「らむ」",   forms: ["○", "○", "らむ", "らむ", "らめ", "○"] },
-  { id: "beshi",      name: "推量の助動詞「べし」",       forms: ["べく", "べく", "べし", "べき", "べけれ", "○"] },
-  { id: "maji",       name: "打消推量の助動詞「まじ」",   forms: ["まじく", "まじく", "まじ", "まじき", "まじけれ", "○"] },
-  { id: "mashi",      name: "反実仮想の助動詞「まし」",   forms: ["ませ", "○", "まし", "まし", "ましか", "○"] },
-  { id: "meri",       name: "推定の助動詞「めり」",       forms: ["○", "めり", "めり", "める", "めれ", "○"] },
-  { id: "nari-denbun",name: "伝聞推定の助動詞「なり」",   forms: ["○", "なり", "なり", "なる", "なれ", "○"] },
-  { id: "nari-dantei",name: "断定の助動詞「なり」",       forms: ["なら", "なり", "なり", "なる", "なれ", "なれ"] },
-  { id: "gotoshi",    name: "比況の助動詞「ごとし」",     forms: ["ごとく", "ごとく", "ごとし", "ごとき", "○", "○"] },
-  { id: "tashi",      name: "希望の助動詞「たし」",       forms: ["たく", "たく", "たし", "たき", "たけれ", "○"] },
-  { id: "ru-jido",    name: "受身・自発の助動詞「る」",   forms: ["れ", "れ", "る", "るる", "るれ", "れよ"] },
-  { id: "sasu-shieki",name: "使役の助動詞「さす」",       forms: ["させ", "させ", "さす", "さする", "さすれ", "させよ"] },
+  { id: "ki",         name: "過去の助動詞「き」",         meaning: "過去",             connection: "用言の連用形",             forms: ["せ", "○", "き", "し", "しか", "○"] },
+  { id: "keri",       name: "詠嘆の助動詞「けり」",       meaning: "過去・詠嘆",       connection: "用言の連用形",             forms: ["○", "○", "けり", "ける", "けれ", "○"] },
+  { id: "zu",         name: "打消の助動詞「ず」",         meaning: "打消",             connection: "未然形",                   forms: ["ず", "ず", "ず", "ぬ", "ね", "ざれ"] },
+  { id: "mu",         name: "推量の助動詞「む」",         meaning: "推量・意志",       connection: "未然形",                   forms: ["○", "○", "む", "む", "め", "○"] },
+  { id: "tari-kanryo",name: "完了の助動詞「たり」",       meaning: "完了・存続",       connection: "連用形",                   forms: ["たら", "たり", "たり", "たる", "たれ", "たれ"] },
+  { id: "kaku",       name: "四段活用「書く」",           meaning: "（動詞の活用例）", connection: "―",                        forms: ["か", "き", "く", "く", "け", "け"] },
+  { id: "tsu",        name: "完了の助動詞「つ」",         meaning: "完了・強意",       connection: "連用形",                   forms: ["て", "て", "つ", "つる", "つれ", "てよ"] },
+  { id: "nu-kanryo",  name: "完了の助動詞「ぬ」",         meaning: "完了・強意",       connection: "連用形",                   forms: ["な", "に", "ぬ", "ぬる", "ぬれ", "ね"] },
+  { id: "kemu",       name: "過去推量の助動詞「けむ」",   meaning: "過去推量",         connection: "連用形",                   forms: ["○", "○", "けむ", "けむ", "けめ", "○"] },
+  { id: "ramu",       name: "現在推量の助動詞「らむ」",   meaning: "現在推量",         connection: "終止形（ラ変型には連体形）",forms: ["○", "○", "らむ", "らむ", "らめ", "○"] },
+  { id: "beshi",      name: "推量の助動詞「べし」",       meaning: "推量・当然・可能", connection: "終止形（ラ変型には連体形）",forms: ["べく", "べく", "べし", "べき", "べけれ", "○"] },
+  { id: "maji",       name: "打消推量の助動詞「まじ」",   meaning: "打消推量・打消当然",connection: "終止形（ラ変型には連体形）",forms: ["まじく", "まじく", "まじ", "まじき", "まじけれ", "○"] },
+  { id: "mashi",      name: "反実仮想の助動詞「まし」",   meaning: "反実仮想",         connection: "未然形",                   forms: ["ませ", "○", "まし", "まし", "ましか", "○"] },
+  { id: "meri",       name: "推定の助動詞「めり」",       meaning: "推定・婉曲",       connection: "終止形（ラ変型には連体形）",forms: ["○", "めり", "めり", "める", "めれ", "○"] },
+  { id: "nari-denbun",name: "伝聞推定の助動詞「なり」",   meaning: "伝聞・推定",       connection: "終止形（ラ変型には連体形）",forms: ["○", "なり", "なり", "なる", "なれ", "○"] },
+  { id: "nari-dantei",name: "断定の助動詞「なり」",       meaning: "断定・存在",       connection: "体言・連体形",             forms: ["なら", "なり", "なり", "なる", "なれ", "なれ"] },
+  { id: "gotoshi",    name: "比況の助動詞「ごとし」",     meaning: "比況",             connection: "体言＋の／連体形",         forms: ["ごとく", "ごとく", "ごとし", "ごとき", "○", "○"] },
+  { id: "tashi",      name: "希望の助動詞「たし」",       meaning: "希望",             connection: "連用形",                   forms: ["たく", "たく", "たし", "たき", "たけれ", "○"] },
+  { id: "ru-jido",    name: "受身・自発の助動詞「る」",   meaning: "受身・自発・可能・尊敬", connection: "四段・ナ変・ラ変の未然形", forms: ["れ", "れ", "る", "るる", "るれ", "れよ"] },
+  { id: "sasu-shieki",name: "使役の助動詞「さす」",       meaning: "使役・尊敬",       connection: "未然形（下二段型以外の動詞）", forms: ["させ", "させ", "さす", "さする", "さすれ", "させよ"] },
 ];
 
-// colorVar をここで自動的に割り当てる（PATTERN_SOURCEの並び順に対してcycleする）
+// PATTERNSはもう色を持たない。PATTERN_SOURCEをそのまま使う。
 const PATTERNS = PATTERN_SOURCE;
 
 // 1回のゲームで出題するパターン数（この数を変えるだけで出題数を増減できる）
@@ -93,6 +96,7 @@ const state = {
   timerHandle: null,
   elapsedSeconds: 0,
   isCleared: false,
+  isModalOpen: false,     // 学習メモモーダルを表示中はtrue（盤面操作・タイマーを止める）
 };
 
 /* ------------------------------------------------------------------------
@@ -125,7 +129,7 @@ function showScreen(activeId) {
   SCREEN_IDS.forEach((id) => {
     const el = document.getElementById(id);
     if (!el) {
-      console.error(`[活用ネオン] 画面要素が見つかりません: #${id}`);
+      console.error(`[月灯りの活用帳] 画面要素が見つかりません: #${id}`);
       return;
     }
     if (id === activeId) {
@@ -156,12 +160,15 @@ function buildDeck(difficulty, selectedPatterns) {
 
   // 出題対象として選ばれたパターンの分だけ「正解セット」を用意する
   // （選ばれた種類数 × 6マス）
+  // 色(colorVar)は助動詞の種類とは無関係に、盤面上の「並び順(rowIndex)」だけで決める。
+  // → 1行目は必ず青、2行目は必ず紫…という固定順になり、出題される助動詞が
+  //   毎回ランダムでも、色は毎回「青・紫・赤・緑・黄・水色」の6色が重複なく揃う。
   selectedPatterns.forEach((pattern, rowIndex) => {
     pattern.forms.forEach((value, colIndex) => {
       deck.push({
         value,
         patternId: pattern.id,
-        colorVar: pattern.colorVar,
+        colorVar: ROW_COLOR_VARS[rowIndex % ROW_COLOR_VARS.length],
         correctRow: rowIndex,
         correctCol: colIndex,
         isDummy: false,
@@ -190,12 +197,7 @@ function startGame(difficulty) {
   // PATTERNS（全助動詞データ）からランダムにPATTERN_SELECT_COUNT種類、重複なしで抽出する
   // ここが要件のコア部分：
   //   const selectedPatterns = getRandomPatterns(PATTERNS, 6);
- const selectedPatterns =
-  getRandomPatterns(PATTERNS, PATTERN_SELECT_COUNT)
-    .map((pattern, index) => ({
-      ...pattern,
-      colorVar: GROUP_COLOR_VARS[index]
-    }));
+  const selectedPatterns = getRandomPatterns(PATTERNS, PATTERN_SELECT_COUNT);
 
   state.difficulty = difficulty;
   state.selectedPatterns = selectedPatterns;
@@ -209,6 +211,9 @@ function startGame(difficulty) {
   state.combo = 0;
   state.elapsedSeconds = 0;
   state.isCleared = false;
+  state.isModalOpen = false;
+  learnModalQueue = [];
+  document.getElementById("learn-modal").classList.remove("is-active");
 
   // 要件どおりの順番で処理する：
   // タイトル非表示→ゲーム表示 → 盤面シャッフル生成 → タイマー開始
@@ -232,11 +237,12 @@ function renderBoard() {
   const board = document.getElementById("board");
   board.innerHTML = "";
 
-  // 難易度によってヒントの強さクラスを切り替える
+  // 難易度によってヒントの強さクラスを切り替える。
+  // 初級・中級は「青・紫・赤・緑・黄・水色」を同じ強さで表示し(hint-strongで統一)、
+  // 上級のみ色ヒントを一切出さない(hint-none)。
   board.classList.remove("hint-strong", "hint-weak", "hint-none");
-  if (state.difficulty === "beginner") board.classList.add("hint-strong");
-  else if (state.difficulty === "intermediate") board.classList.add("hint-weak");
-  else board.classList.add("hint-none");
+  if (state.difficulty === "advanced") board.classList.add("hint-none");
+  else board.classList.add("hint-strong");
 
   // 列見出し（未然形〜命令形）は常時表示
   KEI_LABELS.forEach((label) => {
@@ -270,10 +276,16 @@ function renderBoard() {
       // ロックされていないマスだけ操作可能にする
       el.draggable = true;
       el.addEventListener("click", () => onCellClick(index));
+      // PC向け：HTML標準のドラッグ＆ドロップ
       el.addEventListener("dragstart", (e) => onDragStart(e, index));
       el.addEventListener("dragover", (e) => onDragOver(e, index));
       el.addEventListener("dragleave", (e) => onDragLeave(e, index));
       el.addEventListener("drop", (e) => onDrop(e, index));
+      // スマホ向け：指でのドラッグ（HTML標準D&DはiPhoneで動作しないため独自実装）
+      el.addEventListener("touchstart", (e) => onTouchStart(e, index), { passive: true });
+      el.addEventListener("touchmove", (e) => onTouchMove(e), { passive: false });
+      el.addEventListener("touchend", (e) => onTouchEnd(e), { passive: false });
+      el.addEventListener("touchcancel", () => onTouchCancel(), { passive: true });
       el.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
@@ -301,14 +313,17 @@ function renderHintLegend() {
   }
   legend.classList.remove("is-hidden");
 
-  // 凡例には「今回選ばれた6種類」だけを表示する
-  state.selectedPatterns.forEach((pattern) => {
+  // 凡例には「今回選ばれた6種類」を、盤面と同じ「青・紫・赤・緑・黄・水色」の順で表示する。
+  // 色は助動詞の種類ではなく、ここでも並び順(index)だけで決める。
+  state.selectedPatterns.forEach((pattern, index) => {
+    const colorVar = ROW_COLOR_VARS[index % ROW_COLOR_VARS.length];
+
     const item = document.createElement("span");
     item.className = "legend-item";
     const dot = document.createElement("span");
     dot.className = "legend-dot";
-    dot.style.background = `var(${pattern.colorVar})`;
-    dot.style.color = `var(${pattern.colorVar})`;
+    dot.style.background = `var(${colorVar})`;
+    dot.style.color = `var(${colorVar})`;
     item.appendChild(dot);
     item.appendChild(document.createTextNode(pattern.name.replace(/^.+「|」$/g, "")));
     legend.appendChild(item);
@@ -320,7 +335,7 @@ function renderHintLegend() {
    ------------------------------------------------------------------------ */
 
 function onCellClick(index) {
-  if (state.isCleared) return;
+  if (state.isCleared || state.isModalOpen) return;
 
   if (state.selectedIndex === null) {
     state.selectedIndex = index;
@@ -370,6 +385,114 @@ function onDrop(e, index) {
 }
 
 /* ------------------------------------------------------------------------
+   7-b. タッチ（スマホ）でのドラッグ＆ドロップ対応
+   HTML標準のドラッグ＆ドロップAPIはiPhone Safariでは機能しないため、
+   touchstart / touchmove / touchend を使って独自に実装する。
+   指を大きく動かさなかった場合（＝タップ）は何もせず、
+   ブラウザ標準の click イベントに処理を任せる
+   （＝従来通りの「タップで2マス選択」操作になる）。
+   ------------------------------------------------------------------------ */
+
+const TOUCH_DRAG_THRESHOLD = 8; // これ以上指が動いたら「ドラッグ」とみなす（px）
+let touchDragState = null;
+
+function onTouchStart(e, index) {
+  if (state.isCleared || state.isModalOpen) return;
+  const touch = e.touches[0];
+  touchDragState = {
+    sourceIndex: index,
+    startX: touch.clientX,
+    startY: touch.clientY,
+    moved: false,
+    ghostEl: null,
+    width: 0,
+    height: 0,
+  };
+}
+
+function onTouchMove(e) {
+  if (!touchDragState) return;
+  const touch = e.touches[0];
+  const dx = touch.clientX - touchDragState.startX;
+  const dy = touch.clientY - touchDragState.startY;
+
+  // しきい値を超えて初めて「ドラッグ開始」とみなし、指に追従する複製マス（ゴースト）を作る
+  if (!touchDragState.moved && Math.hypot(dx, dy) > TOUCH_DRAG_THRESHOLD) {
+    touchDragState.moved = true;
+    const sourceEl = document.querySelector(`.cell[data-index="${touchDragState.sourceIndex}"]`);
+    if (sourceEl) {
+      const rect = sourceEl.getBoundingClientRect();
+      const ghost = sourceEl.cloneNode(true);
+      ghost.classList.add("is-dragging-ghost");
+      ghost.style.width = `${rect.width}px`;
+      ghost.style.height = `${rect.height}px`;
+      ghost.style.left = `${rect.left}px`;
+      ghost.style.top = `${rect.top}px`;
+      document.body.appendChild(ghost);
+      touchDragState.ghostEl = ghost;
+      touchDragState.width = rect.width;
+      touchDragState.height = rect.height;
+    }
+  }
+
+  if (touchDragState.moved) {
+    e.preventDefault(); // ドラッグ中はページ全体のスクロールを止める
+
+    if (touchDragState.ghostEl) {
+      touchDragState.ghostEl.style.left = `${touch.clientX - touchDragState.width / 2}px`;
+      touchDragState.ghostEl.style.top = `${touch.clientY - touchDragState.height / 2}px`;
+    }
+
+    // 指の真下にあるマスをハイライトして「ここに入れ替わる」ことを示す
+    document.querySelectorAll(".cell.is-dragover").forEach((el) => el.classList.remove("is-dragover"));
+    const under = document.elementFromPoint(touch.clientX, touch.clientY);
+    const targetCell = under ? under.closest(".cell:not(.is-dragging-ghost)") : null;
+    if (
+      targetCell &&
+      !targetCell.classList.contains("is-locked") &&
+      Number(targetCell.dataset.index) !== touchDragState.sourceIndex
+    ) {
+      targetCell.classList.add("is-dragover");
+    }
+  }
+}
+
+function onTouchEnd(e) {
+  if (!touchDragState) return;
+
+  document.querySelectorAll(".cell.is-dragover").forEach((el) => el.classList.remove("is-dragover"));
+  if (touchDragState.ghostEl) {
+    touchDragState.ghostEl.remove();
+  }
+
+  if (touchDragState.moved) {
+    e.preventDefault(); // ドラッグとして処理した場合は、続く click イベントを発生させない
+    const touch = e.changedTouches[0];
+    const under = document.elementFromPoint(touch.clientX, touch.clientY);
+    const targetCell = under ? under.closest(".cell") : null;
+    if (targetCell) {
+      const targetIndex = Number(targetCell.dataset.index);
+      if (!Number.isNaN(targetIndex) && targetIndex !== touchDragState.sourceIndex) {
+        swapCells(touchDragState.sourceIndex, targetIndex);
+      }
+    }
+    state.selectedIndex = null;
+  }
+  // moved が false（＝ほぼ動かなかった＝タップ）の場合はここでは何もしない。
+  // このあとブラウザ標準の click イベントが発火し、従来通り「タップで2マス選択」になる。
+
+  touchDragState = null;
+}
+
+function onTouchCancel() {
+  if (touchDragState && touchDragState.ghostEl) {
+    touchDragState.ghostEl.remove();
+  }
+  document.querySelectorAll(".cell.is-dragover").forEach((el) => el.classList.remove("is-dragover"));
+  touchDragState = null;
+}
+
+/* ------------------------------------------------------------------------
    8. マス入れ替え本体と判定
    ------------------------------------------------------------------------ */
 
@@ -401,7 +524,17 @@ function swapCells(indexA, indexB) {
   updateHUD();
   renderBoard();
 
-  // クリア条件は「PATTERNS全件」ではなく「今回選ばれたselectedPatterns」を完成させること
+  // 初級モードで学習メモが溜まっている場合は、先にそれを読んでもらってから
+  // クリア判定を行う（openNextLearnModal の中で最終的にcheckGameClear()を呼ぶ）。
+  if (state.difficulty === "beginner" && learnModalQueue.length > 0) {
+    openNextLearnModal();
+  } else {
+    checkGameClear();
+  }
+}
+
+// クリア条件は「PATTERNS全件」ではなく「今回選ばれたselectedPatterns」を完成させること
+function checkGameClear() {
   if (state.lockedPatternIds.size >= state.selectedPatterns.length) {
     finishGame();
   }
@@ -432,12 +565,17 @@ function applyRowClear(row, pattern) {
   const gained = 100 + (state.combo - 1) * 50;
   state.score += gained;
 
-  showToast(`活用表完成！「${pattern.name}」 +${gained}点`);
+  if (state.difficulty === "beginner") {
+    // 初級モードは学習メモモーダルで知らせる（複数同時完成にも対応できるようキューに積む）
+    learnModalQueue.push(pattern);
+  } else {
+    showToast(`活用表完成！「${pattern.name}」 +${gained}点`);
+  }
 
-  // 発光演出用に少し遅らせてクラスを付与（再描画後に光らせる）
+  // 完成演出：行灯の光がやわらかく灯るように、少し遅らせてクラスを付与する
   requestAnimationFrame(() => {
     const cellsEls = document.querySelectorAll(`.cell[data-group="${pattern.id}"]`);
-    cellsEls.forEach((el) => el.classList.add("is-flash"));
+    cellsEls.forEach((el) => el.classList.add("is-glow"));
   });
 }
 
@@ -460,7 +598,9 @@ function updateHUD() {
 
 function startTimer() {
   stopTimer();
-  state.startTime = Date.now();
+  // 一時停止（学習メモモーダル表示中など）から再開しても経過時間が飛ばないよう、
+  // 既にelapsedSecondsが溜まっている場合はそのぶんstartTimeを過去にずらしておく。
+  state.startTime = Date.now() - state.elapsedSeconds * 1000;
   state.timerHandle = setInterval(() => {
     state.elapsedSeconds = (Date.now() - state.startTime) / 1000;
     document.getElementById("hud-timer").textContent = formatTime(state.elapsedSeconds);
@@ -472,6 +612,48 @@ function stopTimer() {
     clearInterval(state.timerHandle);
     state.timerHandle = null;
   }
+}
+
+/* ------------------------------------------------------------------------
+   9-b. 学習メモモーダル（初級モード限定）
+   一列完成するたびにキューへ積み、1つずつ表示する。
+   表示中は盤面操作を止め、タイマーも一時停止する。
+   ------------------------------------------------------------------------ */
+
+let learnModalQueue = [];
+
+function openNextLearnModal() {
+  const pattern = learnModalQueue.shift();
+  if (!pattern) {
+    // キューが空になったら、ここで初めてクリア判定を行う
+    checkGameClear();
+    return;
+  }
+  showLearnModal(pattern);
+}
+
+function showLearnModal(pattern) {
+  state.isModalOpen = true;
+  stopTimer(); // 学習メモを読んでいる間は経過時間を止める
+
+  document.getElementById("learn-name").textContent = pattern.name;
+  document.getElementById("learn-meaning").textContent = pattern.meaning || "―";
+  document.getElementById("learn-connection").textContent = pattern.connection || "―";
+  document.getElementById("learn-forms").textContent = pattern.forms.join(" ／ ");
+
+  document.getElementById("learn-modal").classList.add("is-active");
+}
+
+function closeLearnModal() {
+  document.getElementById("learn-modal").classList.remove("is-active");
+  state.isModalOpen = false;
+
+  if (!state.isCleared) {
+    startTimer(); // タイマーを再開（経過時間は維持したまま）
+  }
+
+  // キューに次の学習メモがあれば続けて表示し、なければクリア判定へ進む
+  openNextLearnModal();
 }
 
 /* ------------------------------------------------------------------------
@@ -541,13 +723,13 @@ function init() {
   //     すべてstartGame()の中でshowScreen()経由・一括して行う）
   const diffButtons = document.querySelectorAll(".diff-btn");
   if (diffButtons.length === 0) {
-    console.error("[活用ネオン] 難易度ボタン(.diff-btn)が見つかりません。");
+    console.error("[月灯りの活用帳] 難易度ボタン(.diff-btn)が見つかりません。");
   }
   diffButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
       const difficulty = btn.dataset.difficulty;
       if (!difficulty) {
-        console.error("[活用ネオン] data-difficulty が設定されていないボタンがあります。", btn);
+        console.error("[月灯りの活用帳] data-difficulty が設定されていないボタンがあります。", btn);
         return;
       }
       startGame(difficulty);
@@ -559,6 +741,9 @@ function init() {
   if (backBtn) {
     backBtn.addEventListener("click", () => {
       stopTimer();
+      state.isModalOpen = false;
+      learnModalQueue = [];
+      document.getElementById("learn-modal").classList.remove("is-active");
       showScreen("screen-title");
     });
   }
@@ -577,6 +762,14 @@ function init() {
     toTitleBtn.addEventListener("click", () => {
       stopTimer();
       showScreen("screen-title");
+    });
+  }
+
+  // ⑥ 学習メモモーダル：閉じるボタン
+  const learnCloseBtn = document.getElementById("learn-close");
+  if (learnCloseBtn) {
+    learnCloseBtn.addEventListener("click", () => {
+      closeLearnModal();
     });
   }
 }

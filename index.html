@@ -4,17 +4,21 @@
 <meta charset="UTF-8">
 <!-- スマホでも見やすいようにビューポートを設定 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>活用ネオン ― 古文助動詞パズル</title>
+<title>月灯りの活用帳 ― 古文助動詞パズル</title>
 
-<!-- Googleフォント読み込み：見出し用(Dela Gothic One) / 本文用(Zen Kaku Gothic New) / 数字用(Orbitron) -->
+<!-- Googleフォント読み込み：見出し・和文用(Shippori Mincho) / 本文・UI用(Zen Kaku Gothic New) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- 桜の花びらエフェクト用の入れ物。中身はJavaScriptが自動生成する -->
+<!-- 夜空の背景演出：星・月・桜（すべて装飾でクリック不可） -->
+<div id="night-sky" aria-hidden="true">
+  <div id="stars"></div>
+  <div id="moon"></div>
+</div>
 <div id="sakura-layer" aria-hidden="true"></div>
 
 <div id="app">
@@ -23,15 +27,15 @@
   <!-- ① タイトル画面（難易度選択）      -->
   <!-- ============================== -->
   <section id="screen-title" class="screen is-active">
-    <div class="title-panel">
-      <p class="eyebrow">CYBER × 和風 学習パズル</p>
-      <h1 class="game-logo">活用<span>ネオン</span></h1>
-      <p class="game-sub">シャッフルされた活用語を並べ替えて、古文助動詞の活用表を光らせろ。</p>
+    <div class="title-panel washi-panel">
+      <p class="eyebrow">夜の平安 古典学習</p>
+      <h1 class="game-logo">月灯りの<span>活用帳</span></h1>
+      <p class="game-sub">散らばった活用語を並べ替えて、古文助動詞の活用表を月明かりの下で完成させましょう。</p>
 
       <div class="difficulty-select">
         <button class="diff-btn" data-difficulty="beginner">
           <span class="diff-name">初級</span>
-          <span class="diff-desc">色ヒントあり</span>
+          <span class="diff-desc">色ヒントあり・学習メモつき</span>
         </button>
         <button class="diff-btn" data-difficulty="intermediate">
           <span class="diff-name">中級</span>
@@ -43,7 +47,7 @@
         </button>
       </div>
 
-      <p class="rule-hint">マスをタップ（クリック）して2つ選ぶと入れ替わります。ドラッグ＆ドロップにも対応。</p>
+      <p class="rule-hint">マスをタップして2つ選ぶと入れ替わります。指で直接ドラッグしての入れ替えにも対応。</p>
     </div>
   </section>
 
@@ -56,15 +60,15 @@
 
       <div class="hud">
         <div class="hud-item">
-          <span class="hud-label">SCORE</span>
+          <span class="hud-label">得点</span>
           <span class="hud-value" id="hud-score">0</span>
         </div>
         <div class="hud-item" id="hud-combo-wrap">
-          <span class="hud-label">COMBO</span>
+          <span class="hud-label">連続</span>
           <span class="hud-value" id="hud-combo">0</span>
         </div>
         <div class="hud-item" id="hud-timer-wrap">
-          <span class="hud-label">TIME</span>
+          <span class="hud-label">時間</span>
           <span class="hud-value" id="hud-timer">00:00</span>
         </div>
         <div class="hud-item">
@@ -78,7 +82,7 @@
     <div id="hint-legend" class="hint-legend"></div>
 
     <!-- 盤面本体：列見出し＋マスのグリッド -->
-    <div class="board-wrap">
+    <div class="board-wrap washi-panel">
       <div id="board" class="board"></div>
     </div>
 
@@ -89,9 +93,9 @@
   <!-- ③ クリア画面（オーバーレイ）       -->
   <!-- ============================== -->
   <section id="screen-clear" class="screen">
-    <div class="clear-panel">
-      <p class="clear-eyebrow">ALL COMPLETE</p>
-      <h2 class="clear-title">活用表完成！</h2>
+    <div class="clear-panel washi-panel">
+      <p class="clear-eyebrow">全巻完成</p>
+      <h2 class="clear-title">活用表、完成いたしました</h2>
 
       <div class="clear-rank" id="clear-rank">S</div>
 
@@ -111,12 +115,37 @@
       </dl>
 
       <div class="clear-buttons">
-        <button id="btn-retry" class="neon-btn">もう一度遊ぶ</button>
+        <button id="btn-retry" class="primary-btn">もう一度遊ぶ</button>
         <button id="btn-to-title" class="ghost-btn">タイトルへ戻る</button>
       </div>
     </div>
   </section>
 
+</div>
+
+<!-- ============================== -->
+<!-- ④ 学習メモ モーダル（初級モード限定） -->
+<!-- ============================== -->
+<div id="learn-modal" class="modal-overlay">
+  <div class="learn-card">
+    <p class="learn-eyebrow">学習メモ</p>
+    <h3 id="learn-name">―</h3>
+    <dl class="learn-dl">
+      <div class="learn-row">
+        <dt>意味</dt>
+        <dd id="learn-meaning"></dd>
+      </div>
+      <div class="learn-row">
+        <dt>接続</dt>
+        <dd id="learn-connection"></dd>
+      </div>
+      <div class="learn-row">
+        <dt>活用</dt>
+        <dd id="learn-forms"></dd>
+      </div>
+    </dl>
+    <button id="learn-close" class="primary-btn">閉じる</button>
+  </div>
 </div>
 
 <script src="script.js"></script>
