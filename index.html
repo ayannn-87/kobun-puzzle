@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <!-- スマホでも見やすいようにビューポートを設定 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>月灯りの活用帳 ― 古文助動詞パズル</title>
+<title>雅ラン ― 古文助動詞パズル</title>
 
 <!-- Googleフォント読み込み：見出し・和文用(Shippori Mincho) / 本文・UI用(Zen Kaku Gothic New) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -29,7 +29,7 @@
   <section id="screen-title" class="screen is-active">
     <div class="title-panel washi-panel">
       <p class="eyebrow">夜の平安 古典学習</p>
-      <h1 class="game-logo">月灯りの<span>活用帳</span></h1>
+      <h1 class="game-logo">雅<span>ラン</span></h1>
       <p class="game-sub">散らばった活用語を並べ替えて、古文助動詞の活用表を月明かりの下で完成させましょう。</p>
 
       <div class="difficulty-select">
@@ -124,26 +124,35 @@
 </div>
 
 <!-- ============================== -->
-<!-- ④ 学習メモ モーダル（初級モード限定） -->
+<!-- ④ 学習メモ モーダル（初級モード限定）
+     表示順：助動詞名 → 接続 → 意味一覧 → 活用 → 識別のポイント → 例文 -->
 <!-- ============================== -->
 <div id="learn-modal" class="modal-overlay">
   <div class="learn-card">
     <p class="learn-eyebrow">学習メモ</p>
     <h3 id="learn-name">―</h3>
-    <dl class="learn-dl">
-      <div class="learn-row">
-        <dt>意味</dt>
-        <dd id="learn-meaning"></dd>
-      </div>
-      <div class="learn-row">
-        <dt>接続</dt>
-        <dd id="learn-connection"></dd>
-      </div>
-      <div class="learn-row">
-        <dt>活用</dt>
-        <dd id="learn-forms"></dd>
-      </div>
-    </dl>
+    <p class="learn-connection-line">接続：<span id="learn-connection"></span></p>
+
+    <div class="learn-section">
+      <p class="learn-section-title">意味</p>
+      <ul id="learn-meanings" class="learn-meaning-list"></ul>
+    </div>
+
+    <div class="learn-section">
+      <p class="learn-section-title">活用</p>
+      <p id="learn-forms" class="learn-forms-line"></p>
+    </div>
+
+    <div class="learn-section">
+      <p class="learn-section-title">識別のポイント</p>
+      <p id="learn-notes" class="learn-notes-text"></p>
+    </div>
+
+    <div class="learn-section">
+      <p class="learn-section-title">例文</p>
+      <ul id="learn-examples" class="learn-example-list"></ul>
+    </div>
+
     <button id="learn-close" class="primary-btn">閉じる</button>
   </div>
 </div>

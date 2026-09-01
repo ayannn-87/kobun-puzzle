@@ -1,5 +1,5 @@
 /* ==========================================================================
-   月灯りの活用帳 — 「夜の平安時代」学習アプリ スタイルシート
+   雅ラン — 「夜の平安時代」学習アプリ スタイルシート
 
    デザインコンセプト：
      夜空 × 月明かり × 行灯 × 和紙 × 巻物 × 桜
@@ -34,13 +34,24 @@
 
   /* ---- 活用グループごとのヒントカラー ----
      助動詞の種類にはもう紐づかず、出題順(1〜6番目)に固定で割り当てる。
-     1番目=青 / 2番目=紫 / 3番目=赤 / 4番目=緑 / 5番目=黄 / 6番目=水色 */
+     1番目=青 / 2番目=紫 / 3番目=赤 / 4番目=緑 / 5番目=黄 / 6番目=水色
+     初級用（はっきり見分けられる配色） */
   --grp-blue:   #3d5a8c; /* 瑠璃色 */
   --grp-purple: #6c4f8c; /* 古代紫 */
   --grp-red:    #a8434b; /* 紅色   */
   --grp-green:  #5c8a5f; /* 若草色 */
   --grp-yellow: #c9a24b; /* 山吹金 */
   --grp-cyan:   #4a8f9c; /* 縹色   */
+
+  /* 中級用：同じ6色相を保ちつつ彩度・明度を寄せて「少し見分けにくく」した配色。
+     色相(青・紫・赤・緑・黄・水色)自体は初級と変えていないため、
+     色覚特性のあるユーザーでも手がかり(色相)自体は失われないよう配慮している。 */
+  --grp-blue-mid:   #6f85ab;
+  --grp-purple-mid: #8d7aa6;
+  --grp-red-mid:    #b17c82;
+  --grp-green-mid:  #86a488;
+  --grp-yellow-mid: #cbb583;
+  --grp-cyan-mid:   #7fadb6;
 
   --radius: 16px;
 }
@@ -215,6 +226,22 @@ button{ font-family: inherit; }
   transition: background 0.15s ease;
 }
 .ghost-btn:hover{ background: rgba(227,200,120,0.14); }
+
+/* 結果画面(明るい和紙パネル)の中に置かれる「タイトルへ戻る」等は、
+   通常のghost-btn(暗い夜空背景を前提とした配色)のままだと
+   文字色(--washi=生成り色)と和紙パネルの地色がほぼ同化して読めなくなるため、
+   ここだけ「墨色の文字＋はっきりした縁取り」の配色に上書きする。
+   （ゲーム画面ヘッダーの「← タイトル」ボタンは夜空背景の上にあるため対象外＝変更なし） */
+.washi-panel .ghost-btn{
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1.5px solid var(--ink-soft);
+  box-shadow: 0 2px 6px rgba(42,33,22,0.15);
+}
+.washi-panel .ghost-btn:hover{
+  background: rgba(255, 255, 255, 0.8);
+  border-color: var(--ink);
+}
 
 /* ==========================================================================
    ① タイトル画面
@@ -531,7 +558,9 @@ button{ font-family: inherit; }
 .modal-overlay.is-active{ display:flex; }
 
 .learn-card{
-  width: min(420px, 100%);
+  width: min(440px, 100%);
+  max-height: min(86vh, 700px);
+  overflow-y: auto;
   border-radius: 18px;
   padding: clamp(22px, 5vw, 32px) clamp(20px, 5vw, 28px);
   text-align:center;
@@ -553,29 +582,91 @@ button{ font-family: inherit; }
 #learn-name{
   font-family: "Shippori Mincho", serif;
   font-size: 1.2rem;
-  margin: 0 0 18px;
+  margin: 0 0 10px;
   color: var(--ink);
 }
 
-.learn-dl{ margin: 0 0 22px; text-align:left; }
-.learn-row{
-  display:flex;
-  gap: 14px;
-  padding: 9px 0;
+.learn-connection-line{
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  margin: 0 0 18px;
+  text-align: left;
+}
+.learn-connection-line span{ color: var(--ink); font-weight: 600; }
+
+.learn-section{
+  text-align: left;
+  margin: 0 0 18px;
+  padding-top: 12px;
   border-top: 1px solid rgba(122,106,74,0.25);
 }
-.learn-row:first-child{ border-top:none; }
-.learn-row dt{
-  flex: 0 0 44px;
-  font-size: 0.72rem;
-  color: var(--ink-soft);
-  padding-top: 2px;
+.learn-section:first-of-type{ border-top: none; padding-top: 0; }
+
+.learn-section-title{
+  font-size: 0.68rem;
+  letter-spacing: 0.15em;
+  color: var(--vermillion);
+  margin: 0 0 8px;
 }
-.learn-row dd{
-  margin:0;
+
+/* 意味一覧：複数の意味を持つ助動詞のために、タグのように並べて表示する */
+.learn-meaning-list{
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.learn-meaning-list li{
+  font-size: 0.82rem;
+  color: var(--ink);
+  background: rgba(201,162,75,0.16);
+  border: 1px solid rgba(201,162,75,0.5);
+  border-radius: 999px;
+  padding: 3px 12px;
+}
+
+.learn-forms-line{
+  margin: 0;
   font-size: 0.9rem;
   color: var(--ink);
-  line-height:1.6;
+  line-height: 1.6;
+}
+
+.learn-notes-text{
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--ink-soft);
+  line-height: 1.75;
+}
+
+/* 例文：例文本体＋現代語訳・補足を1セットとして縦に並べる */
+.learn-example-list{
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.learn-example-list li{
+  background: rgba(255,255,255,0.4);
+  border-left: 3px solid var(--gold);
+  border-radius: 4px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.learn-example-sentence{
+  font-family: "Shippori Mincho", serif;
+  font-size: 0.92rem;
+  color: var(--ink);
+}
+.learn-example-note{
+  font-size: 0.76rem;
+  color: var(--ink-soft);
 }
 
 /* ==========================================================================
