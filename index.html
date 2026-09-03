@@ -21,12 +21,63 @@
 </div>
 <div id="sakura-layer" aria-hidden="true"></div>
 
+<!-- ============================== -->
+<!-- キャラクター常時表示HUD（タイトル画面・ゲーム画面で表示。JS側で表示/非表示を切替） -->
+<!-- ============================== -->
+<div id="character-hud" class="character-hud" aria-hidden="true">
+  <div id="character-portrait" class="character-portrait" data-character="hime" data-expression="normal">
+    <img id="character-portrait-img" class="cp-img" src="assets/character-hime-face.webp" alt="">
+    <div class="cp-sparkles" aria-hidden="true"></div>
+  </div>
+
+  <div class="character-hud-info">
+    <p class="character-hud-name"><span id="character-hud-type">姫</span>・<span id="character-hud-rank">庶民</span></p>
+    <p class="character-hud-level">Lv.<span id="character-hud-level">1</span></p>
+    <div class="character-hud-expbar">
+      <div class="character-hud-expbar-fill" id="character-hud-expbar-fill"></div>
+    </div>
+  </div>
+
+  <!-- 一列完成時のセリフ吹き出し（自動で数秒後に消える） -->
+  <div id="character-bubble" class="character-bubble"></div>
+</div>
+
 <div id="app">
+
+  <!-- ============================== -->
+  <!-- ⓪ キャラクター選択画面（初回のみ／未選択時のみ表示） -->
+  <!-- ============================== -->
+  <section id="screen-character-select" class="screen">
+    <div class="title-panel washi-panel">
+      <p class="eyebrow">出仕のはじまり</p>
+      <h1 class="game-logo">まずは<span>身分</span>を選ぶ</h1>
+      <p class="game-sub">庶民として宮中への出仕を始めます。あなたの分身を選んでください。</p>
+
+      <div class="character-select-grid">
+        <button class="character-select-card" data-character="hime">
+          <span class="character-select-portrait" data-character-preview="hime" aria-hidden="true">
+            <img src="assets/character-hime.webp" alt="">
+          </span>
+          <span class="character-select-name">姫</span>
+          <span class="character-select-desc">雅やかに、着実に出世する</span>
+        </button>
+        <button class="character-select-card" data-character="kokushi">
+          <span class="character-select-portrait" data-character-preview="kokushi" aria-hidden="true">
+            <img src="assets/character-kokushi.webp" alt="">
+          </span>
+          <span class="character-select-name">貴公子</span>
+          <span class="character-select-desc">凛として、宮中を歩む</span>
+        </button>
+      </div>
+
+      <p class="rule-hint">選んだ分身は後からいつでも見返せます（変更は今後のアップデートで対応予定）。</p>
+    </div>
+  </section>
 
   <!-- ============================== -->
   <!-- ① タイトル画面（難易度選択）      -->
   <!-- ============================== -->
-  <section id="screen-title" class="screen is-active">
+  <section id="screen-title" class="screen">
     <div class="title-panel washi-panel">
       <p class="eyebrow">夜の平安 古典学習</p>
       <h1 class="game-logo">雅<span>ラン</span></h1>
@@ -46,6 +97,10 @@
           <span class="diff-desc">色ヒントなし・ダミーマス混入</span>
         </button>
       </div>
+
+      <button id="btn-reset-data" class="menu-btn">
+        データリセット
+      </button>
 
       <p class="rule-hint">マスをタップして2つ選ぶと入れ替わります。指で直接ドラッグしての入れ替えにも対応。</p>
     </div>
@@ -112,6 +167,18 @@
           <dt>完成行数</dt>
           <dd id="clear-rows">6 / 6</dd>
         </div>
+        <div class="clear-stat">
+          <dt>ミス回数</dt>
+          <dd id="clear-miss">0回</dd>
+        </div>
+        <div class="clear-stat">
+          <dt>正答率</dt>
+          <dd id="clear-accuracy">100%</dd>
+        </div>
+        <div class="clear-stat">
+          <dt>獲得EXP</dt>
+          <dd id="clear-exp">+0</dd>
+        </div>
       </dl>
 
       <div class="clear-buttons">
@@ -154,6 +221,25 @@
     </div>
 
     <button id="learn-close" class="primary-btn">閉じる</button>
+  </div>
+</div>
+
+<!-- ============================== -->
+<!-- ⑤ レベルアップ／身分昇格 演出モーダル -->
+<!-- ============================== -->
+<div id="levelup-modal" class="modal-overlay">
+  <div class="levelup-card">
+    <div id="levelup-portrait" class="character-portrait levelup-portrait" data-character="hime" data-expression="celebrate">
+      <img id="levelup-portrait-img" class="cp-img" src="assets/character-hime.webp" alt="">
+      <div class="cp-sparkles" aria-hidden="true"></div>
+    </div>
+
+    <p id="levelup-banner" class="levelup-banner">✦ レベルアップ ✦</p>
+    <h3 id="levelup-title">Lv.<span id="levelup-newlevel">2</span></h3>
+    <p id="levelup-rankchange" class="levelup-rankchange"></p>
+    <p id="levelup-line" class="levelup-line"></p>
+
+    <button id="levelup-close" class="primary-btn">つづける</button>
   </div>
 </div>
 

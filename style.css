@@ -670,6 +670,283 @@ button{ font-family: inherit; }
 }
 
 /* ==========================================================================
+   ⓪ キャラクター選択画面
+   ========================================================================== */
+.character-select-grid{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 24px 0 22px;
+}
+.character-select-card{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.35);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 10px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.character-select-card:hover{
+  background: rgba(255,255,255,0.55);
+  box-shadow: 0 8px 20px -12px rgba(42,33,22,0.5);
+  transform: translateY(-2px);
+}
+.character-select-portrait{
+  width: 108px;
+  height: 148px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.5), rgba(255,255,255,0) 70%);
+  border-radius: 16px 16px 10px 10px;
+  border: 2px solid var(--gold);
+  overflow: hidden;
+  position: relative;
+}
+.character-select-portrait img{
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: bottom center;
+  display: block;
+}
+.character-select-name{
+  font-family: "Shippori Mincho", serif;
+  font-size: 1.05rem;
+  color: var(--vermillion);
+}
+.character-select-desc{ font-size: 0.7rem; color: var(--ink-soft); }
+
+/* ==========================================================================
+   キャラクター立ち絵（HUD・キャラ選択・レベルアップ演出で共通利用）
+   実写のイラスト(webp)を使用し、表情の違いはアニメーション・フィルターで表現する
+   （個別の表情差分画像は用意していないため）。
+   ========================================================================== */
+.cp-img{
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: bottom center;
+  display: block;
+  filter: none;
+  transition: filter 0.2s ease;
+}
+
+/* 通常時：穏やかな表情（＝アニメーションなしの静止状態） */
+.character-portrait[data-expression="troubled"] .cp-img{
+  animation: cpShake 0.4s ease;
+  filter: saturate(0.75) brightness(0.97);
+}
+.character-portrait[data-expression="happy"] .cp-img{
+  animation: cpBounce 0.5s ease;
+  filter: brightness(1.05) saturate(1.08);
+}
+.character-portrait[data-expression="celebrate"] .cp-img{
+  animation: cpCelebrate 0.6s ease;
+  filter: brightness(1.1) saturate(1.15);
+}
+@keyframes cpShake{
+  0%, 100%{ transform: translateX(0); }
+  25%{ transform: translateX(-3px); }
+  75%{ transform: translateX(3px); }
+}
+@keyframes cpBounce{
+  0%{ transform: translateY(0); }
+  30%{ transform: translateY(-6px); }
+  60%{ transform: translateY(1px); }
+  100%{ transform: translateY(0); }
+}
+@keyframes cpCelebrate{
+  0%{ transform: scale(1); }
+  40%{ transform: scale(1.12); }
+  70%{ transform: scale(0.97); }
+  100%{ transform: scale(1); }
+}
+
+/* ==========================================================================
+   キャラクター常時表示HUD
+   ========================================================================== */
+.character-hud{
+  display: none; /* JS側で is-active 相当のクラスを付けて表示する */
+  position: fixed;
+  z-index: 20;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px 8px 8px;
+  background: linear-gradient(180deg, rgba(243,234,210,0.94), rgba(232,218,179,0.94));
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 10px 26px -14px rgba(0,0,0,0.6), 0 0 0 1px rgba(201,162,75,0.35);
+  /* PC：画面右上固定 */
+  top: 14px;
+  right: 14px;
+}
+.character-hud.is-visible{ display: flex; }
+
+.character-portrait{
+  position: relative;
+  width: 46px;
+  height: 54px;
+  flex: 0 0 auto;
+}
+
+.cp-sparkles{ display: none; }
+.character-portrait[data-expression="celebrate"] .cp-sparkles{
+  display: block;
+  position: absolute;
+  inset: -14px;
+  background:
+    radial-gradient(2px 2px at 10% 15%, var(--gold-soft), transparent 60%),
+    radial-gradient(2px 2px at 85% 20%, var(--gold-soft), transparent 60%),
+    radial-gradient(2px 2px at 20% 85%, var(--gold-soft), transparent 60%),
+    radial-gradient(2px 2px at 80% 80%, var(--gold-soft), transparent 60%);
+  animation: sparkleSpin 1.6s linear infinite;
+  pointer-events: none;
+}
+@keyframes sparkleSpin{
+  0%{ opacity: 0.4; transform: rotate(0deg) scale(0.9); }
+  50%{ opacity: 1; transform: rotate(180deg) scale(1.05); }
+  100%{ opacity: 0.4; transform: rotate(360deg) scale(0.9); }
+}
+
+.character-hud-info{ display: flex; flex-direction: column; gap: 2px; min-width: 92px; }
+.character-hud-name{
+  margin: 0;
+  font-family: "Shippori Mincho", serif;
+  font-size: 0.72rem;
+  color: var(--ink);
+}
+.character-hud-level{
+  margin: 0;
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+}
+.character-hud-expbar{
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(42,33,22,0.15);
+  overflow: hidden;
+  margin-top: 2px;
+}
+.character-hud-expbar-fill{
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--gold), var(--gold-soft));
+  transition: width 0.4s ease;
+}
+
+/* セリフの吹き出し：完成時に一時的に表示し、自動で消える */
+.character-bubble{
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  max-width: 220px;
+  background: var(--washi);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 0.76rem;
+  color: var(--ink);
+  box-shadow: 0 8px 20px -12px rgba(0,0,0,0.5);
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.character-bubble::before{
+  content:"";
+  position: absolute;
+  top: -6px; right: 24px;
+  width: 10px; height: 10px;
+  background: var(--washi);
+  border-left: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  transform: rotate(45deg);
+}
+.character-bubble.is-show{ opacity: 1; transform: translateY(0); }
+
+/* モバイル：画面上部中央固定に切り替え */
+@media (max-width: 640px){
+  .character-hud{
+    top: 8px;
+    right: 8px;
+    left: 8px;
+    justify-content: center;
+  }
+  .character-hud-info{ min-width: 0; flex: 1 1 auto; max-width: 160px; }
+  .character-bubble{ right: 50%; transform: translate(50%, -4px); max-width: 78vw; }
+  .character-bubble.is-show{ transform: translate(50%, 0); }
+  .character-bubble::before{ right: 50%; transform: translate(50%, 0) rotate(45deg); }
+}
+
+/* ==========================================================================
+   ⑤ レベルアップ／身分昇格モーダル
+   ========================================================================== */
+.levelup-card{
+  width: min(380px, 100%);
+  text-align: center;
+  border-radius: 22px;
+  padding: clamp(26px, 6vw, 36px) clamp(20px, 6vw, 28px);
+  animation: clearIn 0.4s cubic-bezier(.2,1.2,.4,1);
+  background:
+    repeating-linear-gradient(45deg, transparent 0px, transparent 9px, rgba(122,106,74,0.06) 9px, rgba(122,106,74,0.06) 10px),
+    linear-gradient(180deg, var(--washi), var(--washi-dark));
+  border: 1px solid var(--gold);
+  box-shadow: 0 0 40px rgba(201,162,75,0.35), 0 24px 50px -28px rgba(0,0,0,0.8);
+}
+
+/* 最高身分「伝説級」到達時だけの、ひときわ豪華な祝福演出（派手すぎない範囲で金の輝きを強める） */
+.levelup-card.is-legendary{
+  border: 1.5px solid var(--gold);
+  box-shadow: 0 0 60px rgba(201,162,75,0.6), 0 0 100px rgba(201,162,75,0.25), 0 24px 50px -28px rgba(0,0,0,0.85);
+  animation: clearIn 0.4s cubic-bezier(.2,1.2,.4,1), legendaryPulse 2.2s ease-in-out 0.4s infinite;
+}
+.levelup-card.is-legendary .levelup-banner{
+  color: var(--gold);
+  text-shadow: 0 0 12px rgba(201,162,75,0.6);
+}
+@keyframes legendaryPulse{
+  0%, 100%{ box-shadow: 0 0 60px rgba(201,162,75,0.6), 0 0 100px rgba(201,162,75,0.25), 0 24px 50px -28px rgba(0,0,0,0.85); }
+  50%{ box-shadow: 0 0 80px rgba(201,162,75,0.8), 0 0 140px rgba(201,162,75,0.4), 0 24px 50px -28px rgba(0,0,0,0.85); }
+}
+
+.levelup-portrait{
+  width: 140px;
+  height: 190px;
+  margin: 0 auto 12px;
+}
+.levelup-banner{
+  font-size: 0.72rem;
+  letter-spacing: 0.3em;
+  color: var(--vermillion);
+  margin: 0 0 6px;
+}
+#levelup-title{
+  font-family: "Shippori Mincho", serif;
+  font-size: 1.8rem;
+  color: var(--ink);
+  margin: 0 0 10px;
+}
+.levelup-rankchange{
+  font-size: 0.85rem;
+  color: var(--indigo);
+  margin: 0 0 10px;
+  min-height: 1.2em;
+}
+.levelup-line{
+  font-size: 0.86rem;
+  color: var(--ink-soft);
+  line-height: 1.7;
+  margin: 0 0 22px;
+}
+
+/* ==========================================================================
    レスポンシブ調整（スマホ向け）
    ========================================================================== */
 @media (max-width: 480px){
@@ -678,9 +955,10 @@ button{ font-family: inherit; }
   .game-header{ justify-content:center; }
   .board{ gap: 4px; }
   #moon{ top: 3%; right: 6%; }
+  .character-select-grid{ grid-template-columns: 1fr; }
 }
 
 /* 動きを抑えたい設定のユーザーへの配慮 */
 @media (prefers-reduced-motion: reduce){
-  .petal, .cell, .primary-btn, .clear-panel, .toast, #stars{ animation: none !important; transition: none !important; }
+  .petal, .cell, .primary-btn, .clear-panel, .toast, #stars, .cp-sparkles, .levelup-card{ animation: none !important; transition: none !important; }
 }
