@@ -1066,12 +1066,12 @@ let expressionTimeoutHandle = null;
 // キャラ選択・レベルアップ演出は全身が映える通常画像を使う。
 const CHARACTER_IMAGE_SRC = {
   hime: {
-    full: "assets/character-hime.webp",
-    face: "assets/character-hime.webp"
+    full: "character-hime.webp",
+    face: "character-hime.webp"
   },
   kokushi: {
-    full: "assets/character-kokushi.webp",
-    face: "assets/character-kokushi.webp"
+    full: "character-kokushi.webp",
+    face: "character-kokushi.webp"
   },
 };
 function getCharacterImageSrc(characterType, variant) {
