@@ -275,11 +275,35 @@ button{ font-family: inherit; }
 }
 .game-logo span{ color: var(--vermillion); }
 
+.game-tagline{
+  font-family: "Shippori Mincho", serif;
+  font-size: 0.92rem;
+  letter-spacing: 0.12em;
+  color: var(--indigo);
+  margin: 0 0 14px;
+}
+
 .game-sub{
   color: var(--ink-soft);
   font-size: 0.88rem;
   line-height:1.8;
   margin: 0 0 28px;
+}
+
+/* ブランドタイトル画面の「はじめる」ボタン：主導線なので少し大きめ・目立たせる */
+.start-btn{
+  font-size: 1.05rem;
+  padding: 15px 46px;
+  letter-spacing: 0.2em;
+}
+
+/* 通常のタイトル画面（難易度選択）の見出し。ブランド画面より控えめなサイズにする */
+.mode-select-title{
+  font-family: "Shippori Mincho", serif;
+  font-weight: 700;
+  font-size: clamp(1.3rem, 5vw, 1.6rem);
+  margin: 0 0 22px;
+  color: var(--ink);
 }
 
 .difficulty-select{
@@ -683,10 +707,12 @@ button{ font-family: inherit; }
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  background: rgba(255,255,255,0.35);
+  background:
+    repeating-linear-gradient(45deg, transparent 0px, transparent 9px, rgba(122,106,74,0.05) 9px, rgba(122,106,74,0.05) 10px),
+    rgba(255,255,255,0.32);
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 16px 10px;
+  padding: 16px 10px 14px;
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
@@ -695,16 +721,14 @@ button{ font-family: inherit; }
   box-shadow: 0 8px 20px -12px rgba(42,33,22,0.5);
   transform: translateY(-2px);
 }
+/* キャラクター立ち絵は透過PNG/WebPが前提。白い矩形の枠は置かず、
+   和紙パネルの上に直接立っているように、柔らかい落ち影だけで存在感を出す。 */
 .character-select-portrait{
-  width: 108px;
-  height: 148px;
+  width: 128px;
+  height: 176px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.5), rgba(255,255,255,0) 70%);
-  border-radius: 16px 16px 10px 10px;
-  border: 2px solid var(--gold);
-  overflow: hidden;
   position: relative;
 }
 .character-select-portrait img{
@@ -713,6 +737,7 @@ button{ font-family: inherit; }
   object-fit: contain;
   object-position: bottom center;
   display: block;
+  filter: drop-shadow(0 8px 10px rgba(42,33,22,0.28));
 }
 .character-select-name{
   font-family: "Shippori Mincho", serif;
@@ -732,22 +757,23 @@ button{ font-family: inherit; }
   object-fit: contain;
   object-position: bottom center;
   display: block;
-  filter: none;
+  /* 透過画像を和紙・夜空の上に直接置くため、常に柔らかい落ち影で存在感を出す */
+  filter: drop-shadow(0 4px 7px rgba(20,14,8,0.32));
   transition: filter 0.2s ease;
 }
 
 /* 通常時：穏やかな表情（＝アニメーションなしの静止状態） */
 .character-portrait[data-expression="troubled"] .cp-img{
   animation: cpShake 0.4s ease;
-  filter: saturate(0.75) brightness(0.97);
+  filter: drop-shadow(0 4px 7px rgba(20,14,8,0.32)) saturate(0.75) brightness(0.97);
 }
 .character-portrait[data-expression="happy"] .cp-img{
   animation: cpBounce 0.5s ease;
-  filter: brightness(1.05) saturate(1.08);
+  filter: drop-shadow(0 4px 7px rgba(20,14,8,0.32)) brightness(1.05) saturate(1.08);
 }
 .character-portrait[data-expression="celebrate"] .cp-img{
   animation: cpCelebrate 0.6s ease;
-  filter: brightness(1.1) saturate(1.15);
+  filter: drop-shadow(0 6px 12px rgba(20,14,8,0.38)) brightness(1.1) saturate(1.15);
 }
 @keyframes cpShake{
   0%, 100%{ transform: translateX(0); }

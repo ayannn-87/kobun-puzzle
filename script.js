@@ -38,7 +38,7 @@ function getRowColorVars(difficulty) {
 }
 
 // PATTERNSはもう色を持たない。PATTERN_SOURCEをそのまま使う。
-//getRandomPatterns(PATTERN_SOURCE, PATTERN_SELECT_COUNT)
+// const PATTERNS = PATTERN_SOURCE;
 
 // ---------------------------------------------------------------------
 // 【問題データ】盤面の生成・正誤判定にだけ使う最小限のデータ。
@@ -68,8 +68,6 @@ const PATTERN_SOURCE = [
   { id: "ru-jido",     name: "受身・自発の助動詞「る」",   forms: ["れ", "れ", "る", "るる", "るれ", "れよ"] },
   { id: "sasu-shieki", name: "使役の助動詞「さす」",       forms: ["させ", "させ", "さす", "さする", "さすれ", "させよ"] },
 ];
-
-
 
 // ---------------------------------------------------------------------
 // 【解説データ】学習メモモーダルの表示にだけ使うデータ。パズルの正誤判定には一切関与しない。
@@ -213,8 +211,6 @@ const JODOUSHI_EXPLANATIONS = {
   },
 };
 
-
-
 // 問題データ(pattern)から解説データを引くヘルパー。
 // 将来モジュールが増えた場合は、ここで対象レジストリを切り替える形で拡張する想定。
 function getExplanation(pattern) {
@@ -345,16 +341,6 @@ function savePlayerData() {
   } catch (e) {
     console.error("[雅ラン] セーブデータの保存に失敗しました。", e);
   }
-}
-
-function resetPlayerData() {
-  localStorage.removeItem(SAVE_KEY);
-
-  playerData = createDefaultPlayerData();
-
-  renderCharacterHud();
-
-  showScreen("screen-character-select");
 }
 
 let playerData = createDefaultPlayerData();
@@ -492,7 +478,7 @@ function formatTime(totalSeconds) {
 // クラスの付け外しだけでなく、style.displayも直接書き換えることで
 // 「CSSの読み込みタイミングやクラス指定ミスで画面が重なって表示される」
 // 事故を確実に防ぐ（インラインstyleは外部CSSより優先されるため）。
-const SCREEN_IDS = ["screen-character-select", "screen-title", "screen-game", "screen-clear"];
+const SCREEN_IDS = ["screen-brand-title", "screen-character-select", "screen-title", "screen-game", "screen-clear"];
 
 function showScreen(activeId) {
   SCREEN_IDS.forEach((id) => {
@@ -513,7 +499,7 @@ function showScreen(activeId) {
   // 要件①②：ゲーム開始時（screen-game表示時）・タイトルへ戻った時（screen-title表示時）は、
   // 前の画面で出ていた完成メッセージ（活用表完成！など）を必ずリセットする。
   // ここに集約しておくことで、「戻る」ボタンがどこにあっても・今後増えても取りこぼさない。
-  if (activeId === "screen-title" || activeId === "screen-game") {
+  if (activeId === "screen-brand-title" || activeId === "screen-title" || activeId === "screen-game") {
     clearCompletionMessage();
   }
 }
@@ -608,7 +594,7 @@ function startGame(difficulty) {
   // PATTERNS（全助動詞データ）からランダムにPATTERN_SELECT_COUNT種類、重複なしで抽出する
   // ここが要件のコア部分：
   //   const selectedPatterns = getRandomPatterns(PATTERNS, 6);
-  const selectedPatterns =
+ const selectedPatterns =
   getRandomPatterns(PATTERN_SOURCE, PATTERN_SELECT_COUNT);
 
   state.difficulty = difficulty;
@@ -1393,14 +1379,25 @@ function spawnSakura() {
    ------------------------------------------------------------------------ */
 
 function init() {
-  // ① 起動時はプレイヤーデータを読み込み、キャラクター選択済みかどうかで
-  //    最初に見せる画面を振り分ける（選択済みならキャラクター選択画面はスキップする）。
-  //    HTML側のclass指定に頼らず、ここで明示的に状態を確定させる。
+  // ①②③ 新しい画面遷移：
+  //   起動 → ブランドタイトル画面（常に最初に表示）
+  //        → 「はじめる」を押す
+  //          → 未選択なら：キャラクター選択（初回のみ）→ 通常のタイトル画面（難易度選択）
+  //          → 選択済みなら：そのまま通常のタイトル画面（難易度選択）
+  // キャラクター選択自体は「はじめる」を押した後に限り、未選択の場合だけスキップせず表示する。
   playerData = loadPlayerData();
   renderCharacterHud();
-  showScreen(playerData.characterType ? "screen-title" : "screen-character-select");
+  showScreen("screen-brand-title");
 
   spawnSakura();
+
+  // ブランドタイトル画面：「はじめる」ボタン
+  const startBtn = document.getElementById("btn-start");
+  if (startBtn) {
+    startBtn.addEventListener("click", () => {
+      showScreen(playerData.characterType ? "screen-title" : "screen-character-select");
+    });
+  }
 
   // ⓪ キャラクター選択カード：選んだ瞬間に保存し、以降ずっとそのキャラクターで表示される
   const characterCards = document.querySelectorAll(".character-select-card");
@@ -1479,17 +1476,6 @@ function init() {
       closeLevelUpOverlay();
     });
   }
-}
-
-// ⑧ データリセット
-const resetBtn = document.getElementById("btn-reset-data");
-
-if (resetBtn) {
-  resetBtn.addEventListener("click", () => {
-    if (confirm("セーブデータを削除しますか？")) {
-      resetPlayerData();
-    }
-  });
 }
 
 // スクリプトを</body>直前（DOM要素の後）に配置しているため、

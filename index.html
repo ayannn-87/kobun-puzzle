@@ -26,7 +26,7 @@
 <!-- ============================== -->
 <div id="character-hud" class="character-hud" aria-hidden="true">
   <div id="character-portrait" class="character-portrait" data-character="hime" data-expression="normal">
-    <img id="character-portrait-img" class="cp-img" src="character-hime.webp" alt="">
+    <img id="character-portrait-img" class="cp-img" src="assets/character-hime-face.webp" alt="">
     <div class="cp-sparkles" aria-hidden="true"></div>
   </div>
 
@@ -45,6 +45,20 @@
 <div id="app">
 
   <!-- ============================== -->
+  <!-- ブランドタイトル画面（起動時に必ず最初に表示） -->
+  <!-- ============================== -->
+  <section id="screen-brand-title" class="screen is-active">
+    <div class="title-panel washi-panel">
+      <p class="eyebrow">夜の平安 古典学習</p>
+      <h1 class="game-logo">雅<span>ラン</span></h1>
+      <p class="game-tagline">古文助動詞パズル</p>
+      <p class="game-sub">散らばった活用語を並べ替えて、古文助動詞の活用表を月明かりの下で完成させましょう。解けば解くほど、あなたの分身が宮中で出世していきます。</p>
+
+      <button id="btn-start" class="primary-btn start-btn">はじめる</button>
+    </div>
+  </section>
+
+  <!-- ============================== -->
   <!-- ⓪ キャラクター選択画面（初回のみ／未選択時のみ表示） -->
   <!-- ============================== -->
   <section id="screen-character-select" class="screen">
@@ -56,14 +70,14 @@
       <div class="character-select-grid">
         <button class="character-select-card" data-character="hime">
           <span class="character-select-portrait" data-character-preview="hime" aria-hidden="true">
-            <img src="character-hime.webp" alt="">
+            <img src="assets/character-hime.webp" alt="">
           </span>
           <span class="character-select-name">姫</span>
           <span class="character-select-desc">雅やかに、着実に出世する</span>
         </button>
         <button class="character-select-card" data-character="kokushi">
           <span class="character-select-portrait" data-character-preview="kokushi" aria-hidden="true">
-            <img src="character-kokushi.webp" alt="">
+            <img src="assets/character-kokushi.webp" alt="">
           </span>
           <span class="character-select-name">貴公子</span>
           <span class="character-select-desc">凛として、宮中を歩む</span>
@@ -75,13 +89,12 @@
   </section>
 
   <!-- ============================== -->
-  <!-- ① タイトル画面（難易度選択）      -->
+  <!-- ① タイトル画面（通常のタイトル画面／難易度選択）      -->
   <!-- ============================== -->
   <section id="screen-title" class="screen">
     <div class="title-panel washi-panel">
-      <p class="eyebrow">夜の平安 古典学習</p>
-      <h1 class="game-logo">雅<span>ラン</span></h1>
-      <p class="game-sub">散らばった活用語を並べ替えて、古文助動詞の活用表を月明かりの下で完成させましょう。</p>
+      <p class="eyebrow">修行の間</p>
+      <h2 class="mode-select-title">難易度を選ぶ</h2>
 
       <div class="difficulty-select">
         <button class="diff-btn" data-difficulty="beginner">
@@ -97,10 +110,6 @@
           <span class="diff-desc">色ヒントなし・ダミーマス混入</span>
         </button>
       </div>
-
-      <button id="btn-reset-data" class="menu-btn">
-        データリセット
-      </button>
 
       <p class="rule-hint">マスをタップして2つ選ぶと入れ替わります。指で直接ドラッグしての入れ替えにも対応。</p>
     </div>
@@ -230,7 +239,7 @@
 <div id="levelup-modal" class="modal-overlay">
   <div class="levelup-card">
     <div id="levelup-portrait" class="character-portrait levelup-portrait" data-character="hime" data-expression="celebrate">
-      <img id="levelup-portrait-img" class="cp-img" src="character-hime.webp" alt="">
+      <img id="levelup-portrait-img" class="cp-img" src="assets/character-hime.webp" alt="">
       <div class="cp-sparkles" aria-hidden="true"></div>
     </div>
 
