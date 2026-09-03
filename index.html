@@ -26,7 +26,7 @@
 <!-- ============================== -->
 <div id="character-hud" class="character-hud" aria-hidden="true">
   <div id="character-portrait" class="character-portrait" data-character="hime" data-expression="normal">
-    <img id="character-portrait-img" class="cp-img" src="assets/character-hime-face.webp" alt="">
+    <img id="character-portrait-img" class="cp-img" src="character-hime.webp" alt="">
     <div class="cp-sparkles" aria-hidden="true"></div>
   </div>
 
@@ -70,14 +70,14 @@
       <div class="character-select-grid">
         <button class="character-select-card" data-character="hime">
           <span class="character-select-portrait" data-character-preview="hime" aria-hidden="true">
-            <img src="assets/character-hime.webp" alt="">
+            <img src="character-hime.webp" alt="">
           </span>
           <span class="character-select-name">姫</span>
           <span class="character-select-desc">雅やかに、着実に出世する</span>
         </button>
         <button class="character-select-card" data-character="kokushi">
           <span class="character-select-portrait" data-character-preview="kokushi" aria-hidden="true">
-            <img src="assets/character-kokushi.webp" alt="">
+            <img src="character-kokushi.webp" alt="">
           </span>
           <span class="character-select-name">貴公子</span>
           <span class="character-select-desc">凛として、宮中を歩む</span>
@@ -112,6 +112,11 @@
       </div>
 
       <p class="rule-hint">マスをタップして2つ選ぶと入れ替わります。指で直接ドラッグしての入れ替えにも対応。</p>
+
+      <div class="title-footer-actions">
+        <button id="btn-title-to-brand" class="ghost-btn">タイトルへ戻る</button>
+        <button id="btn-data-reset" class="ghost-btn danger-btn">データリセット</button>
+      </div>
     </div>
   </section>
 
@@ -239,7 +244,7 @@
 <div id="levelup-modal" class="modal-overlay">
   <div class="levelup-card">
     <div id="levelup-portrait" class="character-portrait levelup-portrait" data-character="hime" data-expression="celebrate">
-      <img id="levelup-portrait-img" class="cp-img" src="assets/character-hime.webp" alt="">
+      <img id="levelup-portrait-img" class="cp-img" src="character-hime.webp" alt="">
       <div class="cp-sparkles" aria-hidden="true"></div>
     </div>
 

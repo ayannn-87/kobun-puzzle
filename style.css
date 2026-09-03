@@ -243,6 +243,26 @@ button{ font-family: inherit; }
   border-color: var(--ink);
 }
 
+/* 難易度選択画面の下部に置く「タイトルへ戻る」「データリセット」の並び */
+.title-footer-actions{
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+/* データリセットは取り消せない操作なので、朱色で少し警戒感を出す */
+.washi-panel .ghost-btn.danger-btn{
+  color: var(--vermillion-deep, var(--vermillion));
+  border-color: var(--vermillion);
+  background: rgba(168,64,44,0.06);
+}
+.washi-panel .ghost-btn.danger-btn:hover{
+  background: rgba(168,64,44,0.14);
+  border-color: var(--vermillion-deep, var(--vermillion));
+}
+
 /* ==========================================================================
    ① タイトル画面
    ========================================================================== */
@@ -760,6 +780,13 @@ button{ font-family: inherit; }
   /* 透過画像を和紙・夜空の上に直接置くため、常に柔らかい落ち影で存在感を出す */
   filter: drop-shadow(0 4px 7px rgba(20,14,8,0.32));
   transition: filter 0.2s ease;
+}
+
+/* 常時表示HUDは小さいため、全身ではなく顔まわりが見えるようにズームする
+   （専用の顔サムネイル画像は使わず、1枚の全身画像をCSSだけでトリミングする） */
+#character-portrait .cp-img{
+  object-fit: cover;
+  object-position: top center;
 }
 
 /* 通常時：穏やかな表情（＝アニメーションなしの静止状態） */

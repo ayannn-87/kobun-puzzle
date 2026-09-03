@@ -37,8 +37,7 @@ function getRowColorVars(difficulty) {
   return ROW_COLOR_VARS_BY_DIFFICULTY[difficulty] || ROW_COLOR_VARS_BY_DIFFICULTY.beginner;
 }
 
-// PATTERNSはもう色を持たない。PATTERN_SOURCEをそのまま使う。
-// const PATTERNS = PATTERN_SOURCE;
+// 出題データの正本は PATTERN_SOURCE。エイリアスは持たせず、直接これを参照する。
 
 // ---------------------------------------------------------------------
 // 【問題データ】盤面の生成・正誤判定にだけ使う最小限のデータ。
@@ -343,6 +342,18 @@ function savePlayerData() {
   }
 }
 
+// データリセット：localStorageの保存データを削除し、キャラクター選択・レベル・EXP・称号・
+// プレイ履歴などをすべて初期状態に戻す。呼び出し側（確認ダイアログでOKされた場合）からのみ呼ぶ。
+function resetPlayerData() {
+  try {
+    localStorage.removeItem(SAVE_KEY);
+  } catch (e) {
+    console.error("[雅ラン] セーブデータの削除に失敗しました。", e);
+  }
+  playerData = createDefaultPlayerData();
+  renderCharacterHud();
+}
+
 let playerData = createDefaultPlayerData();
 
 // EXPを付与し、レベル・身分を再計算する。
@@ -591,11 +602,10 @@ function buildDeck(difficulty, selectedPatterns) {
 }
 
 function startGame(difficulty) {
-  // PATTERNS（全助動詞データ）からランダムにPATTERN_SELECT_COUNT種類、重複なしで抽出する
+  // PATTERN_SOURCE（全助動詞データ）からランダムにPATTERN_SELECT_COUNT種類、重複なしで抽出する
   // ここが要件のコア部分：
-  //   const selectedPatterns = getRandomPatterns(PATTERNS, 6);
- const selectedPatterns =
-  getRandomPatterns(PATTERN_SOURCE, PATTERN_SELECT_COUNT);
+  //   const selectedPatterns = getRandomPatterns(PATTERN_SOURCE, 6);
+  const selectedPatterns = getRandomPatterns(PATTERN_SOURCE, PATTERN_SELECT_COUNT);
 
   state.difficulty = difficulty;
   state.selectedPatterns = selectedPatterns;
@@ -940,7 +950,7 @@ function swapCells(indexA, indexB) {
   }
 }
 
-// クリア条件は「PATTERNS全件」ではなく「今回選ばれたselectedPatterns」を完成させること
+// クリア条件は「PATTERN_SOURCE全件」ではなく「今回選ばれたselectedPatterns」を完成させること
 function checkGameClear() {
   if (state.lockedPatternIds.size >= state.selectedPatterns.length) {
     finishGame();
@@ -1048,21 +1058,15 @@ let reactionTimeoutHandle = null;
 let expressionTimeoutHandle = null;
 
 // キャラクター種別ごとの立ち絵ファイル（実イラスト）のパス。
-// HUD（常時表示）は小さいので顔まわりだけの正方形サムネイル(-face)を、
-// キャラ選択・レベルアップ演出は全身が映える通常画像を使う。
+// index.html / style.css / script.js と同じ階層に置かれた
+// character-hime.webp / character-kokushi.webp を直接参照する（assetsフォルダ等は使わない）。
 const CHARACTER_IMAGE_SRC = {
-  hime: {
-    full: "character-hime.webp",
-    face: "character-hime.webp"
-  },
-  kokushi: {
-    full: "character-kokushi.webp",
-    face: "character-kokushi.webp"
-  },
+  hime: "character-hime.webp",
+  kokushi: "character-kokushi.webp",
 };
-function getCharacterImageSrc(characterType, variant) {
-  const set = CHARACTER_IMAGE_SRC[characterType] || CHARACTER_IMAGE_SRC.hime;
-  return set[variant] || set.full;
+
+function getCharacterImageSrc(characterType) {
+  return CHARACTER_IMAGE_SRC[characterType] || CHARACTER_IMAGE_SRC.hime;
 }
 
 // 常時表示するキャラクターHUD（ポートレート・称号・レベル・EXPバー）を最新の状態で描画する
@@ -1080,7 +1084,7 @@ function renderCharacterHud() {
   if (portrait) portrait.dataset.character = playerData.characterType;
 
   const portraitImg = document.getElementById("character-portrait-img");
-  if (portraitImg) portraitImg.src = getCharacterImageSrc(playerData.characterType, "face");
+  if (portraitImg) portraitImg.src = getCharacterImageSrc(playerData.characterType);
 
   document.getElementById("character-hud-type").textContent = playerData.characterType === "kokushi" ? "貴公子" : "姫";
   document.getElementById("character-hud-rank").textContent = playerData.rankTitle;
@@ -1274,7 +1278,7 @@ function showLevelUpOverlay({ oldLevel, newLevel }) {
   const portrait = document.getElementById("levelup-portrait");
   portrait.dataset.character = playerData.characterType;
   portrait.dataset.expression = "happy";
-  document.getElementById("levelup-portrait-img").src = getCharacterImageSrc(playerData.characterType, "full");
+  document.getElementById("levelup-portrait-img").src = getCharacterImageSrc(playerData.characterType);
 
   document.getElementById("levelup-modal").classList.add("is-active");
 }
@@ -1295,7 +1299,7 @@ function showRankUpOverlay({ oldLevel, newLevel, oldRank, newRank }) {
   const portrait = document.getElementById("levelup-portrait");
   portrait.dataset.character = playerData.characterType;
   portrait.dataset.expression = "celebrate";
-  document.getElementById("levelup-portrait-img").src = getCharacterImageSrc(playerData.characterType, "full");
+  document.getElementById("levelup-portrait-img").src = getCharacterImageSrc(playerData.characterType);
 
   document.getElementById("levelup-modal").classList.add("is-active");
 }
@@ -1429,6 +1433,26 @@ function init() {
       startGame(difficulty);
     });
   });
+
+  // 難易度選択画面：「タイトルへ戻る」（ブランドタイトル画面へ）
+  const titleToBrandBtn = document.getElementById("btn-title-to-brand");
+  if (titleToBrandBtn) {
+    titleToBrandBtn.addEventListener("click", () => {
+      showScreen("screen-brand-title");
+    });
+  }
+
+  // 難易度選択画面：「データリセット」
+  // 確認ダイアログでOKされた場合のみ、セーブデータを削除して初期状態に戻す
+  const dataResetBtn = document.getElementById("btn-data-reset");
+  if (dataResetBtn) {
+    dataResetBtn.addEventListener("click", () => {
+      const confirmed = window.confirm("すべてのセーブデータを削除します。本当によろしいですか？");
+      if (!confirmed) return;
+      resetPlayerData();
+      showScreen("screen-brand-title");
+    });
+  }
 
   // ③ ゲーム画面からタイトルへ戻る
   const backBtn = document.getElementById("btn-back-title");
