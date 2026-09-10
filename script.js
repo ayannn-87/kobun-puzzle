@@ -704,11 +704,19 @@ function renderBoard() {
   if (state.difficulty === "advanced") board.classList.add("hint-none");
   else board.classList.add("hint-strong");
 
-  // 列見出し（未然形〜命令形）は常時表示
-  KEI_LABELS.forEach((label) => {
+  // 列見出し（未然形〜命令形）は常時表示。初級でヒントLv1以降は、見出しにも
+  // ①〜⑥の丸数字バッジを重ねて表示し、マス側のバッジと対応関係が分かりやすいようにする。
+  const showHeaderBadges = state.difficulty === "beginner" && state.hintLevel >= 1;
+  KEI_LABELS.forEach((label, colIndex) => {
     const head = document.createElement("div");
     head.className = "col-head";
     head.textContent = label;
+    if (showHeaderBadges) {
+      const badge = document.createElement("span");
+      badge.className = "hint-pos-badge hint-pos-badge-head";
+      badge.textContent = CIRCLED_NUMBERS[colIndex];
+      head.appendChild(badge);
+    }
     board.appendChild(head);
   });
 
@@ -1433,6 +1441,7 @@ function showLevelUpOverlay({ oldLevel, newLevel }) {
   document.getElementById("levelup-newlevel").textContent = newLevel;
   document.getElementById("levelup-rankchange").textContent = `Lv${oldLevel} → Lv${newLevel}`;
   document.getElementById("levelup-line").textContent = pickLine(LEVELUP_LINES);
+  document.getElementById("hanko-stamp").classList.remove("is-active"); // 印判は称号獲得（身分昇格）時のみ表示する
 
   const card = document.querySelector("#levelup-modal .levelup-card");
   if (card) card.classList.remove("is-legendary"); // 通常のレベルアップでは豪華演出クラスを外しておく
@@ -1457,6 +1466,15 @@ function showRankUpOverlay({ oldLevel, newLevel, oldRank, newRank }) {
 
   const card = document.querySelector("#levelup-modal .levelup-card");
   if (card) card.classList.toggle("is-legendary", isLegendary);
+
+  // 印判演出：身分昇格の瞬間だけ朱色の印を押す。最高段階（国学博士）では「免状」を思わせる文字にする。
+  const hanko = document.getElementById("hanko-stamp");
+  if (hanko) {
+    hanko.textContent = isLegendary ? "免" : "位";
+    hanko.classList.remove("is-active");
+    void hanko.offsetWidth; // 強制リフローしてアニメーションを毎回再生させる
+    hanko.classList.add("is-active");
+  }
 
   const portrait = document.getElementById("levelup-portrait");
   portrait.dataset.character = playerData.characterType;
@@ -1634,7 +1652,16 @@ function generateShikiQuestion(format) {
   }
 
   if (format === "katsuyokei") {
-    const validCols = pattern.forms.map((f, i) => (f !== "○" ? i : -1)).filter((i) => i !== -1);
+    // 「終止形と連体形が同形」など、同じ語形が複数の活用形にまたがる場合は、
+    // 語だけでは活用形を一意に判定できず答えが割れてしまうため、出題対象から除外する。
+    const formCounts = {};
+    pattern.forms.forEach((f) => {
+      if (f !== "○") formCounts[f] = (formCounts[f] || 0) + 1;
+    });
+    const validCols = pattern.forms
+      .map((f, i) => (f !== "○" && formCounts[f] === 1 ? i : -1))
+      .filter((i) => i !== -1);
+    if (validCols.length === 0) return generateShikiQuestion("meaning"); // 一意に定まる形が無ければ意味当てで代替
     const col = validCols[Math.floor(Math.random() * validCols.length)];
     const word = pattern.forms[col];
     return {
@@ -1933,6 +1960,14 @@ function init() {
     });
   }
 
+  // 出題画面：「難易度選択へ戻る」（修行選択より1つ手前、同じ識別ゲームの難易度選び直しへ）
+  const shikibetsuGameToDiffBtn = document.getElementById("btn-shikibetsu-game-to-diff");
+  if (shikibetsuGameToDiffBtn) {
+    shikibetsuGameToDiffBtn.addEventListener("click", () => {
+      showScreen("screen-shikibetsu-title");
+    });
+  }
+
   const shikiNextBtn = document.getElementById("btn-shiki-next");
   if (shikiNextBtn) {
     shikiNextBtn.addEventListener("click", () => {
@@ -1951,6 +1986,14 @@ function init() {
   if (shikiToTitleBtn) {
     shikiToTitleBtn.addEventListener("click", () => {
       showScreen("screen-mode-select");
+    });
+  }
+
+  // 結果画面：「難易度選択へ戻る」
+  const shikiResultToDiffBtn = document.getElementById("btn-shiki-result-to-diff");
+  if (shikiResultToDiffBtn) {
+    shikiResultToDiffBtn.addEventListener("click", () => {
+      showScreen("screen-shikibetsu-title");
     });
   }
 
