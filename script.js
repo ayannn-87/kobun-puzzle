@@ -231,20 +231,31 @@ function getExplanation(pattern) {
 // この定数を差し替えるか、save/load関数の中身をAPI呼び出しに置き換えるだけでよい設計にしてある。
 const SAVE_KEY = "miyabi-run-save-v1";
 
-// レベル帯ごとの身分（称号）
+// レベル帯ごとの学問段階（身分）。旧・貴族身分制から「学びの深まり」を表す
+// 5段階の呼称へ統合した（見習い→学習者→上級学習者→学者→国学博士）。
+// stage(1〜5)は、キャラクター立ち絵の段階（Lv1〜Lv5の見た目）にもそのまま対応する。
 const RANK_TITLE_BANDS = [
-  { minLevel: 1, maxLevel: 4, title: "庶民" },
-  { minLevel: 5, maxLevel: 9, title: "見習い" },
-  { minLevel: 10, maxLevel: 14, title: "下級貴族" },
-  { minLevel: 15, maxLevel: 19, title: "中級貴族" },
-  { minLevel: 20, maxLevel: 24, title: "上級貴族" },
-  { minLevel: 25, maxLevel: 29, title: "宮中の重職" },
-  { minLevel: 30, maxLevel: Infinity, title: "伝説級" },
+  { minLevel: 1, maxLevel: 5, title: "見習い", stage: 1 },
+  { minLevel: 6, maxLevel: 11, title: "学習者", stage: 2 },
+  { minLevel: 12, maxLevel: 18, title: "上級学習者", stage: 3 },
+  { minLevel: 19, maxLevel: 25, title: "学者", stage: 4 },
+  { minLevel: 26, maxLevel: Infinity, title: "国学博士", stage: 5 },
 ];
 
+function getRankBandForLevel(level) {
+  return (
+    RANK_TITLE_BANDS.find((b) => level >= b.minLevel && level <= b.maxLevel) ||
+    RANK_TITLE_BANDS[RANK_TITLE_BANDS.length - 1]
+  );
+}
+
 function getRankTitleForLevel(level) {
-  const band = RANK_TITLE_BANDS.find((b) => level >= b.minLevel && level <= b.maxLevel);
-  return band ? band.title : "伝説級";
+  return getRankBandForLevel(level).title;
+}
+
+// キャラクター立ち絵の段階（1〜5）。character-hime-lv1.webp 〜 lv5.webp の番号と対応する。
+function getGrowthStageForLevel(level) {
+  return getRankBandForLevel(level).stage;
 }
 
 // レベルNに到達するために必要な「累計EXP」テーブル（index 0 = Lv1 = 0）。
@@ -1183,16 +1194,14 @@ const REACTION_LINES = {
 let reactionTimeoutHandle = null;
 let expressionTimeoutHandle = null;
 
-// キャラクター種別ごとの立ち絵ファイル（実イラスト）のパス。
+// キャラクター種別×成長段階(1〜5)ごとの立ち絵ファイル（実イラスト）のパス。
 // index.html / style.css / script.js と同じ階層に置かれた
-// character-hime.webp / character-kokushi.webp を直接参照する（assetsフォルダ等は使わない）。
-const CHARACTER_IMAGE_SRC = {
-  hime: "character-hime.webp",
-  kokushi: "character-kokushi.webp",
-};
-
-function getCharacterImageSrc(characterType) {
-  return CHARACTER_IMAGE_SRC[characterType] || CHARACTER_IMAGE_SRC.hime;
+// character-hime-lv1.webp 〜 character-kokushi-lv5.webp を直接参照する（assetsフォルダ等は使わない）。
+// 成長段階は getGrowthStageForLevel(playerData.level) から決まる（RANK_TITLE_BANDS参照）。
+function getCharacterImageSrc(characterType, level) {
+  const type = characterType === "kokushi" ? "kokushi" : "hime"; // 未選択時はhimeにフォールバック
+  const stage = Math.min(5, Math.max(1, getGrowthStageForLevel(level || 1)));
+  return `character-${type}-lv${stage}.webp`;
 }
 
 // 常時表示するキャラクターHUD（ポートレート・称号・レベル・EXPバー）を最新の状態で描画する
@@ -1210,7 +1219,7 @@ function renderCharacterHud() {
   if (portrait) portrait.dataset.character = playerData.characterType;
 
   const portraitImg = document.getElementById("character-portrait-img");
-  if (portraitImg) portraitImg.src = getCharacterImageSrc(playerData.characterType);
+  if (portraitImg) portraitImg.src = getCharacterImageSrc(playerData.characterType, playerData.level);
 
   document.getElementById("character-hud-type").textContent = playerData.characterType === "kokushi" ? "貴公子" : "姫";
   document.getElementById("character-hud-rank").textContent = playerData.rankTitle;
@@ -1380,10 +1389,10 @@ const RANKUP_LINES = {
   hime: ["おめでとうございます。ついに「{rank}」になられましたわ。", "ついに宮中へ上がる許しを得ましたわ！"],
   kokushi: ["見事な成長だ。君は「{rank}」へ昇格した。", "新たな地位に至ったようだな。"],
 };
-// 最高身分「伝説級」に到達した時だけの、ひときわ豪華な祝福セリフ
+// 最高段階「国学博士」に到達した時だけの、ひときわ豪華な祝福セリフ
 const LEGENDARY_LINES = {
-  hime: ["ついに……「伝説級」に至りましたわ。あなたの名は、後の世まで語り継がれることでしょう。"],
-  kokushi: ["「伝説級」……。ここまでの道のり、まことに見事であった。"],
+  hime: ["ついに……「国学博士」に至りましたわ。あなたの名は、後の世まで語り継がれることでしょう。"],
+  kokushi: ["「国学博士」……。ここまでの道のり、まことに見事であった。"],
 };
 
 function pickLine(pool, rank) {
@@ -1404,15 +1413,15 @@ function showLevelUpOverlay({ oldLevel, newLevel }) {
   const portrait = document.getElementById("levelup-portrait");
   portrait.dataset.character = playerData.characterType;
   portrait.dataset.expression = "happy";
-  document.getElementById("levelup-portrait-img").src = getCharacterImageSrc(playerData.characterType);
+  document.getElementById("levelup-portrait-img").src = getCharacterImageSrc(playerData.characterType, newLevel);
 
   document.getElementById("levelup-modal").classList.add("is-active");
 }
 
 function showRankUpOverlay({ oldLevel, newLevel, oldRank, newRank }) {
-  const isLegendary = newRank === "伝説級"; // 最高身分に到達した時だけ、ひときわ豪華な演出にする
+  const isLegendary = newRank === "国学博士"; // 最高段階に到達した時だけ、ひときわ豪華な演出にする
 
-  document.getElementById("levelup-banner").textContent = isLegendary ? "✦✦✦ 伝説級 到達 ✦✦✦" : "✦ 身分昇格 ✦";
+  document.getElementById("levelup-banner").textContent = isLegendary ? "✦✦✦ 国学博士 到達 ✦✦✦" : "✦ 身分昇格 ✦";
   document.getElementById("levelup-newlevel").textContent = newLevel;
   document.getElementById("levelup-rankchange").textContent = `${oldRank} → ${newRank}　(Lv${oldLevel} → Lv${newLevel})`;
   document.getElementById("levelup-line").textContent = isLegendary
@@ -1425,7 +1434,7 @@ function showRankUpOverlay({ oldLevel, newLevel, oldRank, newRank }) {
   const portrait = document.getElementById("levelup-portrait");
   portrait.dataset.character = playerData.characterType;
   portrait.dataset.expression = "celebrate";
-  document.getElementById("levelup-portrait-img").src = getCharacterImageSrc(playerData.characterType);
+  document.getElementById("levelup-portrait-img").src = getCharacterImageSrc(playerData.characterType, newLevel);
 
   document.getElementById("levelup-modal").classList.add("is-active");
 }
