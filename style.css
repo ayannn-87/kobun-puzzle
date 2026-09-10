@@ -154,6 +154,7 @@ button{ font-family: inherit; }
 }
 .bgm-toggle-btn:hover{ background: rgba(227,200,120,0.2); }
 .bgm-toggle-btn.is-off{ opacity: 0.6; }
+.bgm-toggle-btn.is-hidden{ display: none; }
 
 .petal{
   position:absolute;
@@ -455,29 +456,21 @@ button{ font-family: inherit; }
   position: absolute;
   top: 2px;
   right: 3px;
-  min-width: 14px;
-  padding: 0 3px;
+  min-width: 16px;
+  padding: 0 2px;
   border-radius: 999px;
   background: var(--gold);
   color: var(--ink);
   font-family: "Shippori Mincho", serif;
-  font-size: 0.58rem;
+  font-size: 0.66rem;
+  font-weight: 700;
   line-height: 1.5;
   text-align: center;
   box-shadow: 0 0 0 1px rgba(255,255,255,0.6);
   pointer-events: none;
 }
 
-/* 初級のみ：列を「右→左」に表示する（古文の活用表らしい見た目にする）。
-   JS側のデータやインデックスは変えず、direction:rtlで見た目の並びだけを反転させる。
-   マス・列見出しの中身（文字）はdirection:ltrに戻し、文字自体は正しい向きで表示する。 */
-.board.rtl-board{
-  direction: rtl;
-}
-.board.rtl-board .cell,
-.board.rtl-board .col-head{
-  direction: ltr;
-}.legend-item{ display:flex; align-items:center; gap: 5px; }
+.legend-item{ display:flex; align-items:center; gap: 5px; }
 .legend-dot{ width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 4px currentColor; }
 
 /* ==========================================================================

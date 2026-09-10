@@ -514,6 +514,15 @@ function showScreen(activeId) {
   if (activeId === "screen-brand-title" || activeId === "screen-title" || activeId === "screen-game") {
     clearCompletionMessage();
   }
+
+  // BGM ON/OFFボタンは「タイトル画面」「難易度選択画面」でのみ表示する。
+  // プレイ中（ゲーム画面）・主人公選択画面・その他の画面では非表示にし、
+  // 画面上の情報を減らして学習に集中しやすくする（BGM自体は表示有無にかかわらず流れ続ける）。
+  const bgmToggleBtn = document.getElementById("btn-bgm-toggle");
+  if (bgmToggleBtn) {
+    const showBgmToggle = activeId === "screen-brand-title" || activeId === "screen-title";
+    bgmToggleBtn.classList.toggle("is-hidden", !showBgmToggle);
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -661,11 +670,6 @@ function renderBoard() {
   if (state.difficulty === "advanced") board.classList.add("hint-none");
   else board.classList.add("hint-strong");
 
-  // 初級のみ、列の並びを「右→左」にする（古文の活用表らしい見た目にし、
-  // 初学者が直感的に読みやすいようにする）。JS側のデータ構造やindexは一切変えず、
-  // CSSのdirection:rtlで見た目の並びだけを反転させている（.rtl-board参照）。
-  board.classList.toggle("rtl-board", state.difficulty === "beginner");
-
   // 列見出し（未然形〜命令形）は常時表示
   KEI_LABELS.forEach((label) => {
     const head = document.createElement("div");
@@ -720,14 +724,19 @@ function renderBoard() {
       el.classList.add("is-selected");
     }
 
-    // 初級ヒントLv1（並び順ヒント）：まだロックされていないマスに、
-    // 本来入るべき列番号（○番目）だけを示す小さなバッジを表示する。
-    // 文字そのものやマスの位置は変えない＝考える余地を残すヒント。
+    // 初級ヒントLv1・Lv2（並び順バッジ）：まだロックされていないマスに、
+    // 本来入るべき列の順番を①〜⑥の丸数字で示す。文字そのものやマスの位置は
+    // 変えない＝答えではなく「並び順」を学ぶためのヒント。
+    // Lv1では前半3列（未然形・連用形・終止形＝①②③）だけ、
+    // Lv2で後半3列（連体形・已然形・命令形＝④⑤⑥）も表示する。
     if (state.difficulty === "beginner" && state.hintLevel >= 1 && !cell.locked && !cell.isDummy) {
-      const badge = document.createElement("span");
-      badge.className = "hint-pos-badge";
-      badge.textContent = `${cell.correctCol + 1}`;
-      el.appendChild(badge);
+      const showThisBadge = state.hintLevel >= 2 || cell.correctCol < 3;
+      if (showThisBadge) {
+        const badge = document.createElement("span");
+        badge.className = "hint-pos-badge";
+        badge.textContent = CIRCLED_NUMBERS[cell.correctCol];
+        el.appendChild(badge);
+      }
     }
 
     board.appendChild(el);
@@ -976,15 +985,20 @@ function checkGameClear() {
 }
 
 /* ------------------------------------------------------------------------
-   9. 初級限定ヒント機能（段階式）
-   Lv1：並び順ヒント……マスの文字・位置は変えず、「○番目」のバッジだけを表示する
-   Lv2・Lv3：一部のマスを、実際に正しい位置へ自動的に入れ替えて公開する
+   9. 初級限定ヒント機能（段階式・並び順学習支援）
+   目的：活用形そのものだけでなく「未然形→連用形→終止形→連体形→已然形→命令形」
+         という並び順自体を学べるようにする。
+   Lv1：①②③（未然形・連用形・終止形＝前半3列）のバッジだけを表示
+   Lv2：④⑤⑥（連体形・已然形・命令形＝後半3列）も追加で表示し、6列すべての
+        並び順バッジが揃う
+   Lv3（最終）：残っているマスを、実際に正しい並び順へ自動的に補正する
    ヒントで動かしたマスは、プレイヤー自身の操作ではないため
    ミス回数・総交換回数・コンボには一切影響させない（swapCellsとは別の関数を使う）。
    ------------------------------------------------------------------------ */
 
 const HINT_MAX_LEVEL = 3;
-const HINT_REVEAL_COUNT_PER_LEVEL = 2; // Lv2・Lv3それぞれで自動公開するマス数
+// ①〜⑥の丸数字。cell.correctCol（0〜5）に対応させる。
+const CIRCLED_NUMBERS = ["①", "②", "③", "④", "⑤", "⑥"];
 
 // ヒントによる入れ替え専用。missCount / totalSwapCount / combo は変更しない。
 // 完成判定・クリア判定・演出キューは通常の交換と同じように処理する。
@@ -1017,19 +1031,17 @@ function swapCellsForHint(indexA, indexB) {
   }
 }
 
-// まだ正しい位置に置かれていないマスを最大count個探し、正しい位置へ入れ替える
-function revealCorrectCells(count) {
-  let revealed = 0;
-  for (let i = 0; i < state.cells.length && revealed < count; i++) {
+// まだ正しい位置に置かれていないマスを、すべて正しい並び順へ入れ替える（Lv3・最終ヒント用）
+function revealAllCorrectCells() {
+  for (let i = 0; i < state.cells.length; i++) {
     const cell = state.cells[i];
     if (cell.locked || cell.isDummy) continue;
 
     const targetIndex = cell.correctRow * state.cols + cell.correctCol;
     if (targetIndex === i) continue; // すでに正しい位置にある
-    if (state.cells[targetIndex].locked) continue; // 交換先がロック済みなら諦めて次を探す
+    if (state.cells[targetIndex].locked) continue; // 交換先がロック済みなら諦めて次へ
 
     swapCellsForHint(i, targetIndex);
-    revealed += 1;
   }
 }
 
@@ -1040,12 +1052,12 @@ function useHint() {
 
   state.hintLevel += 1;
 
-  if (state.hintLevel >= 2) {
-    // Lv2・Lv3：押すたびに数マスずつ、実際に正しい位置へ公開する
-    revealCorrectCells(HINT_REVEAL_COUNT_PER_LEVEL);
+  if (state.hintLevel === HINT_MAX_LEVEL) {
+    // Lv3（最終）：並びを自動補正し、答え合わせができる状態にする
+    revealAllCorrectCells();
   }
-  // Lv1は revealCorrectCells を呼ばない＝renderBoard() 側で
-  // 「○番目」バッジを表示するだけに留める（案2：並び順ヒント）。
+  // Lv1・Lv2は revealAllCorrectCells を呼ばない＝renderBoard() 側で
+  // ①②③（Lv1）／①〜⑥（Lv2）の並び順バッジを表示するだけに留める。
 
   renderBoard();
   updateHintButton();
@@ -1065,7 +1077,7 @@ function updateHintButton() {
     btn.disabled = true;
     btn.textContent = "ヒント（使い切りました）";
   } else {
-    const nextLabels = ["並び順を見る", "一部を公開する", "さらに公開する"];
+    const nextLabels = ["並び順（①②③）を見る", "並び順（④⑤⑥）を見る", "正しい並びに直す"];
     btn.disabled = false;
     btn.textContent = `ヒント：${nextLabels[state.hintLevel]}`;
   }
@@ -1493,22 +1505,36 @@ function spawnSakura() {
 }
 
 /* ------------------------------------------------------------------------
-   11-b. BGM（お琴風・生成型アンビエントBGM）
-   実際の音声ファイルは使わず、Web Audio APIで和風の五音音階（陽旋法）を
-   ゆったりと爪弾くような音を、ランダムなタイミングで鳴らし続ける。
-   勉強・パズルの邪魔にならないよう、音量は控えめ・間隔もゆったりにしてある。
+   11-b. BGM（お琴を中心とした和風アンビエントBGM）
+   実際の音声ファイルは使わず、Web Audio APIで
+     ・常に鳴り続ける和音の持続音（ドローン）……音が途切れないベース
+     ・その上にゆったり重なる、お琴の爪弾きによる分散和音（グリッサンド風）
+   の2層を組み合わせて、和音があり途切れない上品なBGMを生成する。
    ------------------------------------------------------------------------ */
 
 const BGM_PREF_KEY = "miyabi-run-bgm-v1";
 let audioCtx = null;
 let bgmMasterGain = null;
 let bgmEnabled = true;
-let bgmTimerHandle = null;
 let bgmUnlocked = false; // ブラウザの自動再生制限のため、最初のユーザー操作まで実際の再生は待つ
 
-// 陽旋法（お琴などでよく使われる五音音階）の音程。ルート音からの半音差で表す。
+let bgmDroneNodes = null; // { filter, swellLfo, voiceA, voiceB, voiceC }
+let bgmChordTimerHandle = null;
+let bgmCurrentChordIndex = -1;
+
+// 陽旋法（お琴などでよく使われる五音音階）の音程。ルート音からの半音差。
 const KOTO_SCALE_INTERVALS = [0, 2, 5, 7, 9];
-const KOTO_ROOT_HZ = 293.66; // D4を基準にする
+const KOTO_ROOT_HZ = 220.0; // A3を基準にする（ゆったり低めの落ち着いた響き）
+
+// 五音音階の範囲内だけで組んだ和音（ルートからの半音差3音）。
+// どの順に移り変わっても、音階から外れないため濁らず調和する。
+const KOTO_CHORDS = [
+  [0, 7, 14],
+  [2, 9, 14],
+  [5, 9, 17],
+  [0, 5, 12],
+  [7, 14, 19],
+];
 
 function loadBgmPreference() {
   try {
@@ -1533,9 +1559,74 @@ function ensureAudioContext() {
   if (!Ctx) return null; // 対応していないブラウザでは何もしない
   audioCtx = new Ctx();
   bgmMasterGain = audioCtx.createGain();
-  bgmMasterGain.gain.value = 0.16; // 学習の邪魔にならない、控えめな音量
+  bgmMasterGain.gain.value = 0.13; // 全体の音量。学習の邪魔にならない控えめな設定
   bgmMasterGain.connect(audioCtx.destination);
   return audioCtx;
+}
+
+// 常時鳴り続ける持続音（ドローン）を作る。一度作ったら止めずに使い回し、
+// 和音が変わるたびに周波数だけをなめらかに変化させる＝音が途切れることなく
+// 和音だけがゆったり移り変わる（「音が途切れない」「継続的に流れる」要件に対応）。
+function ensureDrone() {
+  if (bgmDroneNodes || !audioCtx || !bgmMasterGain) return bgmDroneNodes;
+
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = 1100;
+  filter.Q.value = 0.3;
+  filter.connect(bgmMasterGain);
+
+  // 持続音に、ごくゆっくりとした音量の揺らぎ（呼吸のような自然な動き）を与える
+  const swellLfo = audioCtx.createOscillator();
+  swellLfo.frequency.value = 0.045; // 約22秒周期
+  const swellLfoGain = audioCtx.createGain();
+  swellLfoGain.gain.value = 0.015;
+  swellLfo.connect(swellLfoGain);
+  swellLfo.start();
+
+  function makeVoice(baseGain) {
+    const osc = audioCtx.createOscillator();
+    osc.type = "sine";
+    const gain = audioCtx.createGain();
+    gain.gain.value = baseGain;
+    swellLfoGain.connect(gain.gain); // 揺らぎを加算
+    osc.connect(gain);
+    gain.connect(filter);
+    osc.start();
+    return { osc, gain };
+  }
+
+  const voiceA = makeVoice(0.05); // ルート音
+  const voiceB = makeVoice(0.035); // 五度
+  const voiceC = makeVoice(0.022); // オクターブ上
+
+  bgmDroneNodes = { filter, swellLfo, voiceA, voiceB, voiceC };
+
+  // 起動直後にいきなり和音が変わって聞こえないよう、最初の和音は即座に設定しておく
+  // （このあとの1回目のscheduleNextChord()で、ここから別の和音へなめらかに移行する）
+  const initialChord = KOTO_CHORDS[0];
+  const now = audioCtx.currentTime;
+  [
+    [voiceA, initialChord[0]],
+    [voiceB, initialChord[1]],
+    [voiceC, initialChord[2]],
+  ].forEach(([voice, semi]) => {
+    voice.osc.frequency.setValueAtTime(KOTO_ROOT_HZ * Math.pow(2, semi / 12), now);
+  });
+  bgmCurrentChordIndex = 0;
+
+  return bgmDroneNodes;
+}
+
+// ドローンの周波数を、指定した和音へ指定秒数かけてなめらかに移行させる（音は止めない）
+function glideDroneToChord(chord, atTime, glideSeconds) {
+  if (!bgmDroneNodes) return;
+  [bgmDroneNodes.voiceA, bgmDroneNodes.voiceB, bgmDroneNodes.voiceC].forEach((voice, i) => {
+    const freq = KOTO_ROOT_HZ * Math.pow(2, chord[i] / 12);
+    voice.osc.frequency.cancelScheduledValues(atTime);
+    voice.osc.frequency.setValueAtTime(voice.osc.frequency.value, atTime);
+    voice.osc.frequency.linearRampToValueAtTime(freq, atTime + glideSeconds);
+  });
 }
 
 // お琴の爪弾き1音分を合成する（速いアタック＋ゆっくりとした減衰）
@@ -1556,7 +1647,7 @@ function pluckKotoNote(freq, startTime, duration, velocity) {
   filter.frequency.value = 2400;
 
   const gain = audioCtx.createGain();
-  const peak = 0.5 * velocity;
+  const peak = 0.32 * velocity;
   gain.gain.setValueAtTime(0.0001, startTime);
   gain.gain.exponentialRampToValueAtTime(peak, startTime + 0.012); // 爪弾きの速いアタック
   gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration); // ゆっくり減衰
@@ -1572,38 +1663,68 @@ function pluckKotoNote(freq, startTime, duration, velocity) {
   osc2.stop(startTime + duration + 0.1);
 }
 
-function scheduleNextBgmNote() {
+// 和音の構成音を、少しずつ時間差をつけて爪弾く（お琴の分散和音／グリッサンド風）。
+// ドローンだけでなく、旋律的な爪弾きの層を重ねることで「和音がある」響きに厚みを出す。
+function pluckChordArpeggio(chord, startTime) {
+  const order = Math.random() < 0.5 ? chord : chord.slice().reverse();
+  order.forEach((semi, i) => {
+    const freq = KOTO_ROOT_HZ * Math.pow(2, semi / 12);
+    const velocity = 0.55 + Math.random() * 0.35;
+    pluckKotoNote(freq, startTime + i * 0.32, 3.0 + Math.random() * 1.2, velocity);
+  });
+  // オクターブ上の音を1つ混ぜて、響きに華やぎを添える
+  if (Math.random() < 0.5) {
+    const topSemi = chord[chord.length - 1] + 12;
+    const topFreq = KOTO_ROOT_HZ * Math.pow(2, topSemi / 12);
+    pluckKotoNote(topFreq, startTime + chord.length * 0.32 + 0.15, 2.4, 0.4);
+  }
+}
+
+function scheduleNextChord() {
   if (!bgmEnabled || !audioCtx) return;
 
-  const now = audioCtx.currentTime;
-  const octaveShift = Math.random() < 0.3 ? 12 : 0; // たまに1オクターブ上の音も混ぜる
-  const interval = KOTO_SCALE_INTERVALS[Math.floor(Math.random() * KOTO_SCALE_INTERVALS.length)];
-  const freq = KOTO_ROOT_HZ * Math.pow(2, (interval + octaveShift) / 12);
-  const velocity = 0.6 + Math.random() * 0.4;
-  pluckKotoNote(freq, now + 0.05, 2.0 + Math.random() * 1.5, velocity);
-
-  // ときどき、続けてもう1音を重ねて短いフレーズにする
-  if (Math.random() < 0.35) {
-    const interval2 = KOTO_SCALE_INTERVALS[Math.floor(Math.random() * KOTO_SCALE_INTERVALS.length)];
-    const freq2 = KOTO_ROOT_HZ * Math.pow(2, interval2 / 12);
-    pluckKotoNote(freq2, now + 0.45, 1.6, velocity * 0.75);
+  let nextIndex = Math.floor(Math.random() * KOTO_CHORDS.length);
+  if (nextIndex === bgmCurrentChordIndex) {
+    nextIndex = (nextIndex + 1) % KOTO_CHORDS.length;
   }
+  bgmCurrentChordIndex = nextIndex;
+  const chord = KOTO_CHORDS[nextIndex];
 
-  const nextDelayMs = 1800 + Math.random() * 2400; // 1.8〜4.2秒間隔でゆったりと鳴らす
-  bgmTimerHandle = setTimeout(scheduleNextBgmNote, nextDelayMs);
+  const now = audioCtx.currentTime;
+  glideDroneToChord(chord, now, 3.5); // ドローンを次の和音へ、3.5秒かけてなめらかに移行
+  pluckChordArpeggio(chord, now + 0.4); // 移行に重ねて、分散和音（お琴の爪弾き）を鳴らす
+
+  const nextDelayMs = 6500 + Math.random() * 3000; // 6.5〜9.5秒ごとに、ゆったりと和音が移り変わる
+  bgmChordTimerHandle = setTimeout(scheduleNextChord, nextDelayMs);
 }
 
 function startBgm() {
   const ctx = ensureAudioContext();
   if (!ctx) return;
   if (ctx.state === "suspended") ctx.resume();
-  clearTimeout(bgmTimerHandle);
-  scheduleNextBgmNote();
+  ensureDrone();
+
+  // フェードイン（OFF→ONで再開した場合も、ぷつっと鳴らさずなめらかに立ち上げる）
+  const now = ctx.currentTime;
+  bgmMasterGain.gain.cancelScheduledValues(now);
+  bgmMasterGain.gain.setValueAtTime(bgmMasterGain.gain.value, now);
+  bgmMasterGain.gain.linearRampToValueAtTime(0.13, now + 1.5);
+
+  clearTimeout(bgmChordTimerHandle);
+  scheduleNextChord();
 }
 
 function stopBgm() {
-  clearTimeout(bgmTimerHandle);
-  bgmTimerHandle = null;
+  clearTimeout(bgmChordTimerHandle);
+  bgmChordTimerHandle = null;
+  // ドローンのオシレーター自体は止めず、マスターの音量だけをなめらかにフェードアウトさせる。
+  // こうしておくと、再びONにした時も音が途切れた感じにならず自然に再開できる。
+  if (audioCtx && bgmMasterGain) {
+    const now = audioCtx.currentTime;
+    bgmMasterGain.gain.cancelScheduledValues(now);
+    bgmMasterGain.gain.setValueAtTime(bgmMasterGain.gain.value, now);
+    bgmMasterGain.gain.linearRampToValueAtTime(0.0001, now + 1.2);
+  }
 }
 
 function setBgmEnabled(enabled) {
@@ -1714,6 +1835,17 @@ function init() {
   const dataResetBtn = document.getElementById("btn-data-reset");
   if (dataResetBtn) {
     dataResetBtn.addEventListener("click", () => {
+      const confirmed = window.confirm("すべてのセーブデータを削除します。本当によろしいですか？");
+      if (!confirmed) return;
+      resetPlayerData();
+      showScreen("screen-brand-title");
+    });
+  }
+
+  // タイトル画面（ブランド画面）：「データリセット」（難易度選択画面のものと同じ処理）
+  const brandDataResetBtn = document.getElementById("btn-brand-data-reset");
+  if (brandDataResetBtn) {
+    brandDataResetBtn.addEventListener("click", () => {
       const confirmed = window.confirm("すべてのセーブデータを削除します。本当によろしいですか？");
       if (!confirmed) return;
       resetPlayerData();
