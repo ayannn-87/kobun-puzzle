@@ -1,21 +1,21 @@
 /* ==========================================================================
-   雅ラン — 「夜の平安時代」学習アプリ スタイルシート
+   雅ラン — 「平安の書院で学問を修める」学習アプリ スタイルシート
 
    デザインコンセプト：
-     夜空 × 月明かり × 行灯 × 和紙 × 巻物 × 桜
-     ネオン／サイバー要素は廃止し、上品で可読性の高い和風UIにする。
+     書院 × 畳 × 屏風 × 御簾 × 巻物 × 書物 × 墨 × 金
+     夜空・月・桜吹雪といった幻想的な演出は廃止し、
+     「学問」「修行」を静かに感じさせる上品な和風UIにする。
    ========================================================================== */
 
 :root{
-  /* ---- 夜空（背景） ---- */
-  --sky-top: #0a1128;
-  --sky-mid: #131b3d;
-  --sky-deep: #241a3f;
+  /* ---- 書院の陽光（背景） ---- */
+  --room-top: #f4ead0;
+  --room-mid: #e6d6a8;
+  --room-deep: #cdb87e;
 
-  /* ---- 月・行灯（あたたかい光） ---- */
-  --moon: #f6ecd2;
-  --moon-glow: rgba(246, 236, 210, 0.35);
-  --lantern: #f0c869;
+  /* ---- 障子越しの光（あたたかい光） ---- */
+  --shoji-light: #fdf6e3;
+  --shoji-glow: rgba(253, 246, 227, 0.4);
 
   /* ---- 和紙・墨（パネルと文字） ---- */
   --washi: #f3ead2;
@@ -24,13 +24,13 @@
   --ink-soft: #6b5c45;
   --line: #7a6a4a;
 
-  /* ---- アクセント ---- */
-  --indigo: #2b3f6b;
-  --purple: #4a3468;
+  /* ---- アクセント：深緑・えんじ・金（貴族の紫紺から、学問所らしい落ち着いた配色へ） ---- */
+  --indigo: #3e5c46;   /* 深緑（旧：藍） */
+  --purple: #5c4a37;   /* 木部を思わせる焦茶（旧：紫） */
   --gold: #c9a24b;
   --gold-soft: #e3c878;
-  --sakura: #f0b9c6;
-  --vermillion: #a8402c;
+  --sakura: #d9a5ac;   /* 庭園越しに見える程度の控えめな桜色として残す */
+  --vermillion: #7a2e34; /* えんじ色（旧：朱） */
 
   /* ---- 活用グループごとのヒントカラー ----
      助動詞の種類にはもう紐づかず、出題順(1〜6番目)に固定で割り当てる。
@@ -61,7 +61,7 @@
 html, body{
   margin:0;
   height:100%;
-  background: var(--sky-top);
+  background: var(--room-top);
   color: var(--ink);
   font-family: "Zen Kaku Gothic New", sans-serif;
   overflow-x:hidden;
@@ -70,15 +70,15 @@ html, body{
 body{
   position:relative;
   min-height:100vh;
-  background: radial-gradient(ellipse at 75% 0%, var(--sky-deep) 0%, var(--sky-mid) 45%, var(--sky-top) 100%);
+  background: radial-gradient(ellipse at 50% 0%, var(--shoji-light) 0%, var(--room-mid) 55%, var(--room-deep) 100%);
 }
 
 button{ font-family: inherit; }
 
 /* ==========================================================================
-   夜空の背景演出（星・月）
+   書院の背景演出（床柱・障子の陽光・巻物）
    ========================================================================== */
-#night-sky{
+#study-room{
   position: fixed;
   inset: 0;
   pointer-events:none;
@@ -86,47 +86,65 @@ button{ font-family: inherit; }
   z-index: 0;
 }
 
-/* 星：小さな光の点を散りばめる（軽量にCSSグラデーションの繰り返しで表現） */
-#stars{
+/* 床柱：画面の左右を木の柱でゆるく縁取る */
+#pillar-left, #pillar-right{
   position:absolute;
-  inset: 0;
-  background-image:
-    radial-gradient(1.6px 1.6px at 12% 18%, rgba(255,255,255,0.85), transparent 60%),
-    radial-gradient(1.4px 1.4px at 28% 8%, rgba(255,255,255,0.7), transparent 60%),
-    radial-gradient(1.8px 1.8px at 42% 32%, rgba(255,255,255,0.8), transparent 60%),
-    radial-gradient(1.3px 1.3px at 58% 14%, rgba(255,255,255,0.65), transparent 60%),
-    radial-gradient(1.6px 1.6px at 71% 26%, rgba(255,255,255,0.8), transparent 60%),
-    radial-gradient(1.4px 1.4px at 85% 10%, rgba(255,255,255,0.7), transparent 60%),
-    radial-gradient(1.7px 1.7px at 93% 40%, rgba(255,255,255,0.75), transparent 60%),
-    radial-gradient(1.3px 1.3px at 8% 45%, rgba(255,255,255,0.6), transparent 60%),
-    radial-gradient(1.5px 1.5px at 35% 55%, rgba(255,255,255,0.6), transparent 60%),
-    radial-gradient(1.4px 1.4px at 64% 60%, rgba(255,255,255,0.55), transparent 60%);
-  background-repeat: no-repeat;
-  animation: twinkle 6s ease-in-out infinite;
+  top: 0;
+  bottom: 0;
+  width: clamp(18px, 3vw, 40px);
+  background: linear-gradient(180deg, #7a5a3a, var(--purple) 60%, #4a3520);
+  opacity: 0.5;
 }
-@keyframes twinkle{
-  0%, 100%{ opacity: 0.75; }
+#pillar-left{ left: 0; box-shadow: 4px 0 16px rgba(42,33,22,0.25); }
+#pillar-right{ right: 0; box-shadow: -4px 0 16px rgba(42,33,22,0.25); }
+
+/* 障子越しの陽光：やわらかく発光する光だまり。ネオンではなく自然光のような表現にする */
+#shoji-glow{
+  position:absolute;
+  top: 4%;
+  right: 10%;
+  width: clamp(140px, 24vw, 320px);
+  height: clamp(140px, 24vw, 320px);
+  border-radius: 50%;
+  background: radial-gradient(circle at 42% 38%, var(--shoji-light), rgba(253,246,227,0.15) 60%, transparent 75%);
+  box-shadow:
+    0 0 60px 20px var(--shoji-glow),
+    0 0 140px 50px rgba(253, 246, 227, 0.12);
+  animation: shojiBreath 9s ease-in-out infinite;
+}
+@keyframes shojiBreath{
+  0%, 100%{ opacity: 0.85; }
   50%{ opacity: 1; }
 }
 
-/* 月：やわらかく発光する円。ネオンではなく行灯のような温かい光にする */
-#moon{
+/* 巻物：画面の隅に、学問所らしい小道具として控えめに配置する */
+#scrolls{
   position:absolute;
-  top: 6%;
-  right: 8%;
-  width: clamp(64px, 12vw, 120px);
-  height: clamp(64px, 12vw, 120px);
-  border-radius: 50%;
-  background: radial-gradient(circle at 38% 34%, #fffaf0, var(--moon) 55%, #d9c896 100%);
-  box-shadow:
-    0 0 30px 10px var(--moon-glow),
-    0 0 80px 30px rgba(246, 236, 210, 0.15);
+  bottom: 4%;
+  left: 3%;
+  width: clamp(50px, 8vw, 90px);
+  height: clamp(16px, 2.6vw, 26px);
+  background: linear-gradient(90deg, #d8c48f, #f0e2b8 50%, #d8c48f);
+  border-radius: 999px;
+  box-shadow: 0 3px 10px rgba(42,33,22,0.3), inset 0 0 0 1px rgba(122,46,52,0.4);
+  opacity: 0.7;
 }
+#scrolls::before, #scrolls::after{
+  content:"";
+  position:absolute;
+  top: -6px;
+  width: 10px;
+  height: calc(100% + 12px);
+  background: #6b5230;
+  border-radius: 4px;
+}
+#scrolls::before{ left: -4px; }
+#scrolls::after{ right: -4px; }
 
 /* ==========================================================================
-   桜の花びらエフェクト（控えめ・上品に）
+   墨の粒子エフェクト（桜吹雪の代わり。控えめに漂う筆の飛沫）
    ========================================================================== */
-#sakura-layer{
+#ink-layer{
   position: fixed;
   inset: 0;
   pointer-events: none;
@@ -134,37 +152,14 @@ button{ font-family: inherit; }
   z-index: 1;
 }
 
-/* BGM ON/OFF切り替えボタン：常に左下固定。
-   キャラクターHUD（右上／モバイルでは上部帯）とは反対側に置き、絶対に重ならないようにする。 */
-.bgm-toggle-btn{
-  position: fixed;
-  z-index: 15;
-  left: 12px;
-  bottom: 12px;
-  font-family: "Shippori Mincho", serif;
-  font-size: 0.7rem;
-  letter-spacing: 0.05em;
-  color: var(--washi);
-  background: rgba(20,11,34,0.62);
-  border: 1px solid rgba(227,200,120,0.5);
-  border-radius: 999px;
-  padding: 7px 14px;
-  cursor: pointer;
-  transition: background 0.15s ease, opacity 0.15s ease;
-}
-.bgm-toggle-btn:hover{ background: rgba(227,200,120,0.2); }
-.bgm-toggle-btn.is-off{ opacity: 0.6; }
-.bgm-toggle-btn.is-hidden{ display: none; }
-
-.petal{
+.ink-mote{
   position:absolute;
   top:-5vh;
-  width: 9px;
-  height: 9px;
-  background: linear-gradient(135deg, var(--sakura), #fbe2e8);
-  border-radius: 100% 0 100% 100%;
-  opacity: 0.4;
-  filter: drop-shadow(0 0 3px rgba(240,185,198,0.4));
+  width: 5px;
+  height: 5px;
+  background: radial-gradient(circle, var(--ink), transparent 75%);
+  border-radius: 50%;
+  opacity: 0.22;
   animation-name: fall, sway;
   animation-timing-function: linear, ease-in-out;
   animation-iteration-count: infinite, infinite;
@@ -355,7 +350,7 @@ button{ font-family: inherit; }
   margin-bottom: 22px;
 }
 
-.diff-btn{
+.diff-btn, .mode-btn, .shiki-diff-btn{
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -368,12 +363,12 @@ button{ font-family: inherit; }
   cursor:pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease, background 0.15s ease;
 }
-.diff-btn:hover{
+.diff-btn:hover, .mode-btn:hover, .shiki-diff-btn:hover{
   background: rgba(255,255,255,0.55);
   box-shadow: 0 6px 16px -10px rgba(42,33,22,0.5);
   transform: translateY(-1px);
 }
-.diff-btn:active{ transform: translateY(0); }
+.diff-btn:active, .mode-btn:active, .shiki-diff-btn:active{ transform: translateY(0); }
 
 .diff-name{
   font-family: "Shippori Mincho", serif;
@@ -1066,6 +1061,86 @@ button{ font-family: inherit; }
 }
 
 /* ==========================================================================
+   助動詞識別ゲーム
+   ========================================================================== */
+.shiki-card{
+  width: min(560px, 100%);
+  border-radius: var(--radius);
+  padding: clamp(18px, 4vw, 28px);
+  text-align: center;
+}
+
+.shiki-format-label{
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  color: var(--vermillion);
+  margin: 0 0 10px;
+}
+
+.shiki-prompt{
+  font-family: "Shippori Mincho", serif;
+  font-size: clamp(1.2rem, 5vw, 1.6rem);
+  color: var(--ink);
+  line-height: 1.6;
+  margin: 0 0 18px;
+  padding: 14px;
+  background: rgba(255,255,255,0.35);
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}
+
+.shiki-question-line{
+  font-size: 0.86rem;
+  color: var(--ink-soft);
+  margin: 0 0 16px;
+}
+
+.shiki-choice-grid{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 480px){
+  .shiki-choice-grid{ grid-template-columns: 1fr; }
+}
+
+.shiki-choice-btn{
+  font-family: "Shippori Mincho", serif;
+  font-size: 0.92rem;
+  color: var(--ink);
+  background: rgba(255,255,255,0.4);
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.shiki-choice-btn:hover:not(:disabled){
+  background: rgba(255,255,255,0.65);
+  border-color: var(--gold);
+  transform: translateY(-1px);
+}
+.shiki-choice-btn:disabled{ cursor: default; }
+.shiki-choice-btn.is-correct{
+  background: color-mix(in srgb, var(--indigo) 22%, rgba(255,255,255,0.4));
+  border-color: var(--indigo);
+  color: var(--ink);
+}
+.shiki-choice-btn.is-wrong{
+  background: color-mix(in srgb, var(--vermillion) 20%, rgba(255,255,255,0.4));
+  border-color: var(--vermillion);
+}
+
+.shiki-feedback{
+  min-height: 1.6em;
+  margin: 16px 0 10px;
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+.shiki-feedback.is-correct-text{ color: var(--indigo); font-weight: 700; }
+.shiki-feedback.is-wrong-text{ color: var(--vermillion); }
+
+/* ==========================================================================
    レスポンシブ調整（スマホ向け）
    ========================================================================== */
 @media (max-width: 480px){
@@ -1073,11 +1148,11 @@ button{ font-family: inherit; }
   .hud{ justify-content:center; width:100%; }
   .game-header{ justify-content:center; }
   .board{ gap: 4px; }
-  #moon{ top: 3%; right: 6%; }
+  #shoji-glow{ top: 2%; right: 4%; }
   .character-select-grid{ grid-template-columns: 1fr; }
 }
 
 /* 動きを抑えたい設定のユーザーへの配慮 */
 @media (prefers-reduced-motion: reduce){
-  .petal, .cell, .primary-btn, .clear-panel, .toast, #stars, .cp-sparkles, .levelup-card{ animation: none !important; transition: none !important; }
+  .ink-mote, .cell, .primary-btn, .clear-panel, .toast, #shoji-glow, .cp-sparkles, .levelup-card{ animation: none !important; transition: none !important; }
 }

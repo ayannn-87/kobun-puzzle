@@ -14,15 +14,14 @@
 </head>
 <body>
 
-<!-- 夜空の背景演出：星・月・桜（すべて装飾でクリック不可） -->
-<div id="night-sky" aria-hidden="true">
-  <div id="stars"></div>
-  <div id="moon"></div>
+<!-- 書院の背景演出：床柱・障子の陽光・巻物（すべて装飾でクリック不可） -->
+<div id="study-room" aria-hidden="true">
+  <div id="pillar-left"></div>
+  <div id="pillar-right"></div>
+  <div id="shoji-glow"></div>
+  <div id="scrolls"></div>
 </div>
-<div id="sakura-layer" aria-hidden="true"></div>
-
-<!-- BGM ON/OFF切り替え（どの画面でも操作できるよう常時表示。左下固定でキャラクターHUDとは重ならない位置） -->
-<button id="btn-bgm-toggle" class="bgm-toggle-btn" type="button" aria-pressed="true">♪ BGM ON</button>
+<div id="ink-layer" aria-hidden="true"></div>
 
 <!-- ============================== -->
 <!-- キャラクター常時表示HUD（タイトル画面・ゲーム画面で表示。JS側で表示/非表示を切替） -->
@@ -94,11 +93,39 @@
   </section>
 
   <!-- ============================== -->
-  <!-- ① タイトル画面（通常のタイトル画面／難易度選択）      -->
+  <!-- ⓪-b 修行の選択画面（活用表パズル / 助動詞識別） -->
+  <!-- ============================== -->
+  <section id="screen-mode-select" class="screen">
+    <div class="title-panel washi-panel">
+      <p class="eyebrow">修行を選ぶ</p>
+      <h2 class="mode-select-title">何を学びますか？</h2>
+
+      <div class="difficulty-select">
+        <button class="mode-btn" data-mode="katsuyou">
+          <span class="diff-name">活用表パズル</span>
+          <span class="diff-desc">シャッフルされた活用形を正しく並べ替える</span>
+        </button>
+        <button class="mode-btn" data-mode="shikibetsu">
+          <span class="diff-name">助動詞識別</span>
+          <span class="diff-desc">名前・活用形・意味を4択で見分ける</span>
+        </button>
+      </div>
+
+      <p class="rule-hint">どちらで学んでも経験値は共通です。同じ分身が成長していきます。</p>
+
+      <div class="title-footer-actions">
+        <button id="btn-mode-to-brand" class="ghost-btn">タイトルへ戻る</button>
+        <button id="btn-mode-data-reset" class="ghost-btn danger-btn">データリセット</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== -->
+  <!-- ① タイトル画面（活用表パズルの難易度選択）      -->
   <!-- ============================== -->
   <section id="screen-title" class="screen">
     <div class="title-panel washi-panel">
-      <p class="eyebrow">修行の間</p>
+      <p class="eyebrow">修行の間・活用表</p>
       <h2 class="mode-select-title">難易度を選ぶ</h2>
 
       <div class="difficulty-select">
@@ -119,8 +146,95 @@
       <p class="rule-hint">マスをタップして2つ選ぶと入れ替わります。指で直接ドラッグしての入れ替えにも対応。</p>
 
       <div class="title-footer-actions">
-        <button id="btn-title-to-brand" class="ghost-btn">タイトルへ戻る</button>
-        <button id="btn-data-reset" class="ghost-btn danger-btn">データリセット</button>
+        <button id="btn-title-to-brand" class="ghost-btn">修行選択へ戻る</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== -->
+  <!-- ①-b 助動詞識別：難易度選択 -->
+  <!-- ============================== -->
+  <section id="screen-shikibetsu-title" class="screen">
+    <div class="title-panel washi-panel">
+      <p class="eyebrow">修行の間・助動詞識別</p>
+      <h2 class="mode-select-title">難易度を選ぶ</h2>
+
+      <div class="difficulty-select">
+        <button class="shiki-diff-btn" data-difficulty="beginner">
+          <span class="diff-name">初級</span>
+          <span class="diff-desc">助動詞名・意味を答える（全5問）</span>
+        </button>
+        <button class="shiki-diff-btn" data-difficulty="intermediate">
+          <span class="diff-name">中級</span>
+          <span class="diff-desc">活用形・文中識別（ヒントあり／全7問）</span>
+        </button>
+        <button class="shiki-diff-btn" data-difficulty="advanced">
+          <span class="diff-name">上級</span>
+          <span class="diff-desc">文中識別（ヒントなし）中心（全8問）</span>
+        </button>
+      </div>
+
+      <p class="rule-hint">「ぬ」「なむ」「らむ・らる」など、紛らわしい識別の定番も出題されます。</p>
+
+      <div class="title-footer-actions">
+        <button id="btn-shikibetsu-back" class="ghost-btn">修行選択へ戻る</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== -->
+  <!-- ①-c 助動詞識別：出題画面 -->
+  <!-- ============================== -->
+  <section id="screen-shikibetsu-game" class="screen">
+    <header class="game-header">
+      <button id="btn-shikibetsu-quit" class="ghost-btn" aria-label="修行をやめて戻る">← やめる</button>
+      <div class="hud">
+        <div class="hud-item">
+          <span class="hud-label">問題</span>
+          <span class="hud-value"><span id="shiki-qnum">1</span>/<span id="shiki-qtotal">5</span></span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">連続正解</span>
+          <span class="hud-value" id="shiki-streak">0</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="shiki-card washi-panel">
+      <p class="shiki-format-label" id="shiki-format-label"></p>
+      <p class="shiki-prompt" id="shiki-prompt"></p>
+      <div class="shiki-choices" id="shiki-choices"></div>
+      <p class="shiki-feedback" id="shiki-feedback"></p>
+      <button id="btn-shiki-next" class="primary-btn is-hidden">次の問題へ</button>
+    </div>
+  </section>
+
+  <!-- ============================== -->
+  <!-- ①-d 助動詞識別：結果画面 -->
+  <!-- ============================== -->
+  <section id="screen-shikibetsu-result" class="screen">
+    <div class="clear-panel washi-panel">
+      <p class="clear-eyebrow">識別修行 完了</p>
+      <h2 class="clear-title">お疲れさまでした</h2>
+
+      <dl class="clear-stats">
+        <div class="clear-stat">
+          <dt>正答数</dt>
+          <dd id="shiki-result-correct">5 / 5</dd>
+        </div>
+        <div class="clear-stat">
+          <dt>最大連続正解</dt>
+          <dd id="shiki-result-streak">0</dd>
+        </div>
+        <div class="clear-stat">
+          <dt>獲得経験値</dt>
+          <dd id="shiki-result-exp">0</dd>
+        </div>
+      </dl>
+
+      <div class="clear-buttons">
+        <button id="btn-shiki-retry" class="primary-btn">もう1セット</button>
+        <button id="btn-shiki-to-title" class="ghost-btn">修行選択へ戻る</button>
       </div>
     </div>
   </section>

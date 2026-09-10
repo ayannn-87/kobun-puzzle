@@ -235,11 +235,11 @@ const SAVE_KEY = "miyabi-run-save-v1";
 // 5段階の呼称へ統合した（見習い→学習者→上級学習者→学者→国学博士）。
 // stage(1〜5)は、キャラクター立ち絵の段階（Lv1〜Lv5の見た目）にもそのまま対応する。
 const RANK_TITLE_BANDS = [
-  { minLevel: 1, maxLevel: 5, title: "見習い", stage: 1 },
-  { minLevel: 6, maxLevel: 11, title: "学習者", stage: 2 },
-  { minLevel: 12, maxLevel: 18, title: "上級学習者", stage: 3 },
-  { minLevel: 19, maxLevel: 25, title: "学者", stage: 4 },
-  { minLevel: 26, maxLevel: Infinity, title: "国学博士", stage: 5 },
+  { minLevel: 1, maxLevel: 3, title: "見習い", stage: 1 },
+  { minLevel: 4, maxLevel: 7, title: "学習者", stage: 2 },
+  { minLevel: 8, maxLevel: 12, title: "上級学習者", stage: 3 },
+  { minLevel: 13, maxLevel: 18, title: "学者", stage: 4 },
+  { minLevel: 19, maxLevel: Infinity, title: "国学博士", stage: 5 },
 ];
 
 function getRankBandForLevel(level) {
@@ -303,7 +303,18 @@ function createDefaultModules() {
     jodoushi_puzzle: { moduleId: "jodoushi_puzzle", displayName: "助動詞活用パズル", status: "available", playCount: 0, bestRank: null, earnedExp: 0 },
     keigo_quiz:      { moduleId: "keigo_quiz",      displayName: "敬語クイズ",       status: "locked",    playCount: 0, bestRank: null, earnedExp: 0 },
     joshi_quiz:      { moduleId: "joshi_quiz",      displayName: "助詞クイズ",       status: "locked",    playCount: 0, bestRank: null, earnedExp: 0 },
-    shikibetsu_quiz: { moduleId: "shikibetsu_quiz", displayName: "識別クイズ",       status: "locked",    playCount: 0, bestRank: null, earnedExp: 0 },
+    shikibetsu_quiz: {
+      moduleId: "shikibetsu_quiz",
+      displayName: "助動詞識別ゲーム",
+      status: "available", // 今回実装したため有効化
+      playCount: 0,
+      bestRank: null,
+      earnedExp: 0,
+      correctCount: 0,
+      totalAnswered: 0,
+      bestStreak: 0,
+      weakPoints: {}, // { patternId: 誤答回数 }（苦手克服の土台。将来の復習モードで利用する想定）
+    },
     tango_quiz:      { moduleId: "tango_quiz",      displayName: "古文単語クイズ",   status: "locked",    playCount: 0, bestRank: null, earnedExp: 0 },
     bungakushi_quiz: { moduleId: "bungakushi_quiz", displayName: "文学史クイズ",     status: "locked",    playCount: 0, bestRank: null, earnedExp: 0 },
   };
@@ -331,11 +342,22 @@ function loadPlayerData() {
     if (!raw) return createDefaultPlayerData();
     const parsed = JSON.parse(raw);
     const defaults = createDefaultPlayerData();
-    // 保存データに無いキーはデフォルトで補い、modulesも同様にマージする
+
+    // modulesは各エントリごとに深くマージする（浅いマージだと、古いセーブデータが
+    // 持っていた旧shikibetsu_quiz（status:"locked"など）が新しいデフォルト値を
+    // 丸ごと上書きしてしまい、今回追加したフィールドや有効化が失われるため）。
+    const mergedModules = {};
+    Object.keys(defaults.modules).forEach((key) => {
+      mergedModules[key] = { ...defaults.modules[key], ...((parsed.modules && parsed.modules[key]) || {}) };
+    });
+    // 助動詞識別ゲームは今回のアップデートで有効化したモジュールのため、
+    // 古いセーブデータに残っている旧ステータス（locked）を引き継がず、常にavailableにする。
+    mergedModules.shikibetsu_quiz.status = "available";
+
     return {
       ...defaults,
       ...parsed,
-      modules: { ...defaults.modules, ...(parsed.modules || {}) },
+      modules: mergedModules,
     };
   } catch (e) {
     console.error("[雅ラン] セーブデータの読み込みに失敗しました。初期状態で開始します。", e);
@@ -501,7 +523,17 @@ function formatTime(totalSeconds) {
 // クラスの付け外しだけでなく、style.displayも直接書き換えることで
 // 「CSSの読み込みタイミングやクラス指定ミスで画面が重なって表示される」
 // 事故を確実に防ぐ（インラインstyleは外部CSSより優先されるため）。
-const SCREEN_IDS = ["screen-brand-title", "screen-character-select", "screen-title", "screen-game", "screen-clear"];
+const SCREEN_IDS = [
+  "screen-brand-title",
+  "screen-character-select",
+  "screen-mode-select",
+  "screen-title",
+  "screen-game",
+  "screen-clear",
+  "screen-shikibetsu-title",
+  "screen-shikibetsu-game",
+  "screen-shikibetsu-result",
+];
 
 function showScreen(activeId) {
   SCREEN_IDS.forEach((id) => {
@@ -524,15 +556,6 @@ function showScreen(activeId) {
   // ここに集約しておくことで、「戻る」ボタンがどこにあっても・今後増えても取りこぼさない。
   if (activeId === "screen-brand-title" || activeId === "screen-title" || activeId === "screen-game") {
     clearCompletionMessage();
-  }
-
-  // BGM ON/OFFボタンは「タイトル画面」「難易度選択画面」でのみ表示する。
-  // プレイ中（ゲーム画面）・主人公選択画面・その他の画面では非表示にし、
-  // 画面上の情報を減らして学習に集中しやすくする（BGM自体は表示有無にかかわらず流れ続ける）。
-  const bgmToggleBtn = document.getElementById("btn-bgm-toggle");
-  if (bgmToggleBtn) {
-    const showBgmToggle = activeId === "screen-brand-title" || activeId === "screen-title";
-    bgmToggleBtn.classList.toggle("is-hidden", !showBgmToggle);
   }
 }
 
@@ -1311,7 +1334,11 @@ function processBigModalQueue() {
       setTimeout(() => showScreen("screen-clear"), 400);
     } else {
       state.isModalOpen = false;
-      if (!state.isCleared) {
+      // startTimer()は活用表パズル専用のタイマーなので、実際にそのゲーム画面が
+      // 表示されている時だけ再開する（助動詞識別ゲームなど他の画面から
+      // このキュー処理が呼ばれた場合に、無関係なタイマーが動き出すのを防ぐ）。
+      const katsuyouScreenActive = document.getElementById("screen-game").classList.contains("is-active");
+      if (katsuyouScreenActive && !state.isCleared) {
         startTimer(); // タイマーを再開（経過時間は維持したまま）
       }
     }
@@ -1491,276 +1518,288 @@ function finishGame() {
    11. 桜の花びらエフェクト生成
    ------------------------------------------------------------------------ */
 
-function spawnSakura() {
-  const layer = document.getElementById("sakura-layer");
-  const PETAL_COUNT = 22;
+// 書院の空気にたゆたう、墨の粒子（塵・筆の飛沫）を控えめに漂わせる。
+// 旧・桜吹雪の実装（fall/swayアニメーション）をそのまま流用し、
+// 形状と色だけを「舞い散る花びら」から「墨の粒子」に差し替えている。
+function spawnInkMotes() {
+  const layer = document.getElementById("ink-layer");
+  const MOTE_COUNT = 14; // 桜吹雪よりも控えめな数にし、学習の邪魔にならないようにする
 
-  for (let i = 0; i < PETAL_COUNT; i++) {
-    const petal = document.createElement("div");
-    petal.className = "petal";
-    const size = 6 + Math.random() * 10;
-    petal.style.width = `${size}px`;
-    petal.style.height = `${size}px`;
-    petal.style.left = `${Math.random() * 100}vw`;
+  for (let i = 0; i < MOTE_COUNT; i++) {
+    const mote = document.createElement("div");
+    mote.className = "ink-mote";
+    const size = 3 + Math.random() * 5;
+    mote.style.width = `${size}px`;
+    mote.style.height = `${size}px`;
+    mote.style.left = `${Math.random() * 100}vw`;
 
-    const fallDuration = 8 + Math.random() * 10;
-    const swayDuration = 3 + Math.random() * 3;
-    const delay = Math.random() * 10;
-    petal.style.animationDuration = `${fallDuration}s, ${swayDuration}s`;
-    petal.style.animationDelay = `${-delay}s, ${-delay}s`;
+    const fallDuration = 10 + Math.random() * 12;
+    const swayDuration = 4 + Math.random() * 3;
+    const delay = Math.random() * 12;
+    mote.style.animationDuration = `${fallDuration}s, ${swayDuration}s`;
+    mote.style.animationDelay = `${-delay}s, ${-delay}s`;
 
-    layer.appendChild(petal);
+    layer.appendChild(mote);
   }
 }
 
 /* ------------------------------------------------------------------------
-   11-b. BGM（お琴を中心とした和風アンビエントBGM）
-   実際の音声ファイルは使わず、Web Audio APIで
-     ・常に鳴り続ける和音の持続音（ドローン）……音が途切れないベース
-     ・その上にゆったり重なる、お琴の爪弾きによる分散和音（グリッサンド風）
-   の2層を組み合わせて、和音があり途切れない上品なBGMを生成する。
+   11-c. 助動詞識別ゲーム
+   活用表パズルとは別の学習モード。専用の問題バンクは用意せず、
+   既存の PATTERN_SOURCE（活用形データ）と JODOUSHI_EXPLANATIONS（意味・例文データ）を
+   そのまま再利用して問題を動的に生成する（正本データを二重管理しないための設計）。
+   経験値は既存の awardExp() をそのまま呼ぶため、レベル・称号・キャラクター成長は
+   活用表パズルと完全に共通化される。
    ------------------------------------------------------------------------ */
 
-const BGM_PREF_KEY = "miyabi-run-bgm-v1";
-let audioCtx = null;
-let bgmMasterGain = null;
-let bgmEnabled = true;
-let bgmUnlocked = false; // ブラウザの自動再生制限のため、最初のユーザー操作まで実際の再生は待つ
+const SHIKI_QUESTIONS_PER_SET = { beginner: 5, intermediate: 7, advanced: 8 };
 
-let bgmDroneNodes = null; // { filter, swellLfo, voiceA, voiceB, voiceC }
-let bgmChordTimerHandle = null;
-let bgmCurrentChordIndex = -1;
+// 難易度ごとに、出題する形式（プロンプトの種類）の候補プール。
+// name=①助動詞名を選ぶ／meaning=②意味を選ぶ／katsuyokei=③活用形を選ぶ／
+// context-hint=④文中識別(対象語のヒントあり)／context=④文中識別(ヒントなし)
+const SHIKI_FORMAT_POOL = {
+  beginner: ["name", "meaning"],
+  intermediate: ["katsuyokei", "context-hint"],
+  advanced: ["context", "katsuyokei", "meaning"],
+};
 
-// 陽旋法（お琴などでよく使われる五音音階）の音程。ルート音からの半音差。
-const KOTO_SCALE_INTERVALS = [0, 2, 5, 7, 9];
-const KOTO_ROOT_HZ = 220.0; // A3を基準にする（ゆったり低めの落ち着いた響き）
+const shikiState = {
+  difficulty: "beginner",
+  questions: [],
+  index: 0,
+  correctCount: 0,
+  streak: 0,
+  bestStreak: 0,
+  awaitingNext: false,
+};
 
-// 五音音階の範囲内だけで組んだ和音（ルートからの半音差3音）。
-// どの順に移り変わっても、音階から外れないため濁らず調和する。
-const KOTO_CHORDS = [
-  [0, 7, 14],
-  [2, 9, 14],
-  [5, 9, 17],
-  [0, 5, 12],
-  [7, 14, 19],
-];
-
-function loadBgmPreference() {
-  try {
-    const saved = localStorage.getItem(BGM_PREF_KEY);
-    return saved === null ? true : saved === "on"; // 未設定時はデフォルトON
-  } catch (e) {
-    return true;
-  }
+// 「「き」」のように括弧書きされたパターン名から、括弧の中身だけを取り出す
+function extractWordFromPatternName(name) {
+  const match = name.match(/「(.+)」/);
+  return match ? match[1] : name;
 }
 
-function saveBgmPreference(enabled) {
-  try {
-    localStorage.setItem(BGM_PREF_KEY, enabled ? "on" : "off");
-  } catch (e) {
-    console.error("[雅ラン] BGM設定の保存に失敗しました。", e);
-  }
+function pickDistractors(pool, excludeValue, count) {
+  const uniquePool = Array.from(new Set(pool.filter((v) => v !== excludeValue)));
+  return shuffleArray(uniquePool).slice(0, count);
 }
 
-function ensureAudioContext() {
-  if (audioCtx) return audioCtx;
-  const Ctx = window.AudioContext || window.webkitAudioContext;
-  if (!Ctx) return null; // 対応していないブラウザでは何もしない
-  audioCtx = new Ctx();
-  bgmMasterGain = audioCtx.createGain();
-  bgmMasterGain.gain.value = 0.13; // 全体の音量。学習の邪魔にならない控えめな設定
-  bgmMasterGain.connect(audioCtx.destination);
-  return audioCtx;
-}
-
-// 常時鳴り続ける持続音（ドローン）を作る。一度作ったら止めずに使い回し、
-// 和音が変わるたびに周波数だけをなめらかに変化させる＝音が途切れることなく
-// 和音だけがゆったり移り変わる（「音が途切れない」「継続的に流れる」要件に対応）。
-function ensureDrone() {
-  if (bgmDroneNodes || !audioCtx || !bgmMasterGain) return bgmDroneNodes;
-
-  const filter = audioCtx.createBiquadFilter();
-  filter.type = "lowpass";
-  filter.frequency.value = 1100;
-  filter.Q.value = 0.3;
-  filter.connect(bgmMasterGain);
-
-  // 持続音に、ごくゆっくりとした音量の揺らぎ（呼吸のような自然な動き）を与える
-  const swellLfo = audioCtx.createOscillator();
-  swellLfo.frequency.value = 0.045; // 約22秒周期
-  const swellLfoGain = audioCtx.createGain();
-  swellLfoGain.gain.value = 0.015;
-  swellLfo.connect(swellLfoGain);
-  swellLfo.start();
-
-  function makeVoice(baseGain) {
-    const osc = audioCtx.createOscillator();
-    osc.type = "sine";
-    const gain = audioCtx.createGain();
-    gain.gain.value = baseGain;
-    swellLfoGain.connect(gain.gain); // 揺らぎを加算
-    osc.connect(gain);
-    gain.connect(filter);
-    osc.start();
-    return { osc, gain };
-  }
-
-  const voiceA = makeVoice(0.05); // ルート音
-  const voiceB = makeVoice(0.035); // 五度
-  const voiceC = makeVoice(0.022); // オクターブ上
-
-  bgmDroneNodes = { filter, swellLfo, voiceA, voiceB, voiceC };
-
-  // 起動直後にいきなり和音が変わって聞こえないよう、最初の和音は即座に設定しておく
-  // （このあとの1回目のscheduleNextChord()で、ここから別の和音へなめらかに移行する）
-  const initialChord = KOTO_CHORDS[0];
-  const now = audioCtx.currentTime;
-  [
-    [voiceA, initialChord[0]],
-    [voiceB, initialChord[1]],
-    [voiceC, initialChord[2]],
-  ].forEach(([voice, semi]) => {
-    voice.osc.frequency.setValueAtTime(KOTO_ROOT_HZ * Math.pow(2, semi / 12), now);
+// 全パターンの「意味」を集めたプール（自分自身の意味を除いた分だけを誤答選択肢に使う）
+function collectAllMeanings(excludePatternId) {
+  const pool = [];
+  PATTERN_SOURCE.forEach((p) => {
+    if (p.id === excludePatternId) return;
+    getExplanation(p).meanings.forEach((m) => {
+      if (!m.startsWith("（")) pool.push(m); // 「（動詞の活用例）」のような注記は除外する
+    });
   });
-  bgmCurrentChordIndex = 0;
-
-  return bgmDroneNodes;
+  return pool;
 }
 
-// ドローンの周波数を、指定した和音へ指定秒数かけてなめらかに移行させる（音は止めない）
-function glideDroneToChord(chord, atTime, glideSeconds) {
-  if (!bgmDroneNodes) return;
-  [bgmDroneNodes.voiceA, bgmDroneNodes.voiceB, bgmDroneNodes.voiceC].forEach((voice, i) => {
-    const freq = KOTO_ROOT_HZ * Math.pow(2, chord[i] / 12);
-    voice.osc.frequency.cancelScheduledValues(atTime);
-    voice.osc.frequency.setValueAtTime(voice.osc.frequency.value, atTime);
-    voice.osc.frequency.linearRampToValueAtTime(freq, atTime + glideSeconds);
+// 指定した形式(format)の問題を1問、既存データから動的に生成する
+function generateShikiQuestion(format) {
+  const pattern = PATTERN_SOURCE[Math.floor(Math.random() * PATTERN_SOURCE.length)];
+  const explanation = getExplanation(pattern);
+  const wordOnly = extractWordFromPatternName(pattern.name);
+
+  if (format === "name") {
+    const validForms = Array.from(new Set(pattern.forms.filter((f) => f !== "○")));
+    const word = validForms[Math.floor(Math.random() * validForms.length)];
+    const otherNames = pickDistractors(PATTERN_SOURCE.map((p) => p.name), pattern.name, 3);
+    return {
+      format,
+      formatLabel: "助動詞名を選ぶ",
+      prompt: `「${word}」`,
+      question: "これは、どの助動詞の活用形？",
+      choices: shuffleArray([pattern.name, ...otherNames]),
+      answer: pattern.name,
+      explanationPattern: pattern,
+    };
+  }
+
+  if (format === "meaning") {
+    const meanings = explanation.meanings.filter((m) => !m.startsWith("（"));
+    if (meanings.length === 0) return generateShikiQuestion("name"); // 意味を持たないデータ（動詞活用例）は代替
+    const correctMeaning = meanings[Math.floor(Math.random() * meanings.length)];
+    const distractors = pickDistractors(collectAllMeanings(pattern.id), correctMeaning, 3);
+    return {
+      format,
+      formatLabel: "意味を選ぶ",
+      prompt: `「${wordOnly}」`,
+      question: "この助動詞の意味として正しいものは？",
+      choices: shuffleArray([correctMeaning, ...distractors]),
+      answer: correctMeaning,
+      explanationPattern: pattern,
+    };
+  }
+
+  if (format === "katsuyokei") {
+    const validCols = pattern.forms.map((f, i) => (f !== "○" ? i : -1)).filter((i) => i !== -1);
+    const col = validCols[Math.floor(Math.random() * validCols.length)];
+    const word = pattern.forms[col];
+    return {
+      format,
+      formatLabel: "活用形を選ぶ",
+      prompt: `「${word}」（${wordOnly}）`,
+      question: "これは何形？",
+      choices: shuffleArray(KEI_LABELS.slice()),
+      answer: KEI_LABELS[col],
+      explanationPattern: pattern,
+    };
+  }
+
+  if (format === "context" || format === "context-hint") {
+    const example = explanation.examples && explanation.examples[0];
+    if (!example) return generateShikiQuestion("meaning"); // 例文が無ければ意味当てで代替
+    const meanings = explanation.meanings.filter((m) => !m.startsWith("（"));
+    const correctMeaning = meanings[0] || explanation.meanings[0];
+    const distractors = pickDistractors(collectAllMeanings(pattern.id), correctMeaning, 3);
+    const hintNote = format === "context-hint" ? `（「${wordOnly}」の働きに注目）` : "";
+    return {
+      format,
+      formatLabel: "文中識別",
+      prompt: example.sentence,
+      question: `文中の助動詞の意味として正しいものは？${hintNote}`,
+      choices: shuffleArray([correctMeaning, ...distractors]),
+      answer: correctMeaning,
+      explanationPattern: pattern,
+    };
+  }
+
+  return generateShikiQuestion("name"); // 未知のformatに対するフォールバック
+}
+
+function buildShikiQuestionSet(difficulty) {
+  const count = SHIKI_QUESTIONS_PER_SET[difficulty] || SHIKI_QUESTIONS_PER_SET.beginner;
+  const formats = SHIKI_FORMAT_POOL[difficulty] || SHIKI_FORMAT_POOL.beginner;
+  const questions = [];
+  for (let i = 0; i < count; i++) {
+    const format = formats[Math.floor(Math.random() * formats.length)];
+    questions.push(generateShikiQuestion(format));
+  }
+  return questions;
+}
+
+function startShikibetsuGame(difficulty) {
+  shikiState.difficulty = difficulty;
+  shikiState.questions = buildShikiQuestionSet(difficulty);
+  shikiState.index = 0;
+  shikiState.correctCount = 0;
+  shikiState.streak = 0;
+  shikiState.bestStreak = 0;
+  shikiState.awaitingNext = false;
+
+  document.getElementById("shiki-qtotal").textContent = shikiState.questions.length;
+  showScreen("screen-shikibetsu-game");
+  renderShikiQuestion();
+}
+
+function renderShikiQuestion() {
+  const q = shikiState.questions[shikiState.index];
+  document.getElementById("shiki-qnum").textContent = shikiState.index + 1;
+  document.getElementById("shiki-streak").textContent = shikiState.streak;
+  document.getElementById("shiki-format-label").textContent = q.formatLabel;
+  document.getElementById("shiki-prompt").textContent = q.prompt;
+
+  const feedback = document.getElementById("shiki-feedback");
+  feedback.textContent = "";
+  feedback.className = "shiki-feedback";
+
+  document.getElementById("btn-shiki-next").classList.add("is-hidden");
+  shikiState.awaitingNext = false;
+
+  const choicesEl = document.getElementById("shiki-choices");
+  choicesEl.innerHTML = "";
+
+  const questionLine = document.createElement("p");
+  questionLine.className = "shiki-question-line";
+  questionLine.textContent = q.question;
+  choicesEl.appendChild(questionLine);
+
+  const grid = document.createElement("div");
+  grid.className = "shiki-choice-grid";
+  q.choices.forEach((choice) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "shiki-choice-btn";
+    btn.textContent = choice;
+    btn.addEventListener("click", () => onShikiChoiceSelected(choice, btn));
+    grid.appendChild(btn);
   });
+  choicesEl.appendChild(grid);
 }
 
-// お琴の爪弾き1音分を合成する（速いアタック＋ゆっくりとした減衰）
-function pluckKotoNote(freq, startTime, duration, velocity) {
-  if (!audioCtx || !bgmMasterGain) return;
+function onShikiChoiceSelected(choice, btnEl) {
+  if (shikiState.awaitingNext) return;
+  shikiState.awaitingNext = true;
 
-  const osc = audioCtx.createOscillator();
-  osc.type = "triangle";
-  osc.frequency.value = freq;
+  const q = shikiState.questions[shikiState.index];
+  const isCorrect = choice === q.answer;
+  const feedback = document.getElementById("shiki-feedback");
 
-  // わずかにデチューンした音を重ね、和楽器らしい響きの厚みを出す
-  const osc2 = audioCtx.createOscillator();
-  osc2.type = "sine";
-  osc2.frequency.value = freq * 2.003;
-
-  const filter = audioCtx.createBiquadFilter();
-  filter.type = "lowpass";
-  filter.frequency.value = 2400;
-
-  const gain = audioCtx.createGain();
-  const peak = 0.32 * velocity;
-  gain.gain.setValueAtTime(0.0001, startTime);
-  gain.gain.exponentialRampToValueAtTime(peak, startTime + 0.012); // 爪弾きの速いアタック
-  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration); // ゆっくり減衰
-
-  osc.connect(filter);
-  osc2.connect(filter);
-  filter.connect(gain);
-  gain.connect(bgmMasterGain);
-
-  osc.start(startTime);
-  osc2.start(startTime);
-  osc.stop(startTime + duration + 0.1);
-  osc2.stop(startTime + duration + 0.1);
-}
-
-// 和音の構成音を、少しずつ時間差をつけて爪弾く（お琴の分散和音／グリッサンド風）。
-// ドローンだけでなく、旋律的な爪弾きの層を重ねることで「和音がある」響きに厚みを出す。
-function pluckChordArpeggio(chord, startTime) {
-  const order = Math.random() < 0.5 ? chord : chord.slice().reverse();
-  order.forEach((semi, i) => {
-    const freq = KOTO_ROOT_HZ * Math.pow(2, semi / 12);
-    const velocity = 0.55 + Math.random() * 0.35;
-    pluckKotoNote(freq, startTime + i * 0.32, 3.0 + Math.random() * 1.2, velocity);
+  document.querySelectorAll(".shiki-choice-btn").forEach((btn) => {
+    btn.disabled = true;
+    if (btn.textContent === q.answer) btn.classList.add("is-correct");
+    else if (btn === btnEl) btn.classList.add("is-wrong");
   });
-  // オクターブ上の音を1つ混ぜて、響きに華やぎを添える
-  if (Math.random() < 0.5) {
-    const topSemi = chord[chord.length - 1] + 12;
-    const topFreq = KOTO_ROOT_HZ * Math.pow(2, topSemi / 12);
-    pluckKotoNote(topFreq, startTime + chord.length * 0.32 + 0.15, 2.4, 0.4);
-  }
-}
 
-function scheduleNextChord() {
-  if (!bgmEnabled || !audioCtx) return;
-
-  let nextIndex = Math.floor(Math.random() * KOTO_CHORDS.length);
-  if (nextIndex === bgmCurrentChordIndex) {
-    nextIndex = (nextIndex + 1) % KOTO_CHORDS.length;
-  }
-  bgmCurrentChordIndex = nextIndex;
-  const chord = KOTO_CHORDS[nextIndex];
-
-  const now = audioCtx.currentTime;
-  glideDroneToChord(chord, now, 3.5); // ドローンを次の和音へ、3.5秒かけてなめらかに移行
-  pluckChordArpeggio(chord, now + 0.4); // 移行に重ねて、分散和音（お琴の爪弾き）を鳴らす
-
-  const nextDelayMs = 6500 + Math.random() * 3000; // 6.5〜9.5秒ごとに、ゆったりと和音が移り変わる
-  bgmChordTimerHandle = setTimeout(scheduleNextChord, nextDelayMs);
-}
-
-function startBgm() {
-  const ctx = ensureAudioContext();
-  if (!ctx) return;
-  if (ctx.state === "suspended") ctx.resume();
-  ensureDrone();
-
-  // フェードイン（OFF→ONで再開した場合も、ぷつっと鳴らさずなめらかに立ち上げる）
-  const now = ctx.currentTime;
-  bgmMasterGain.gain.cancelScheduledValues(now);
-  bgmMasterGain.gain.setValueAtTime(bgmMasterGain.gain.value, now);
-  bgmMasterGain.gain.linearRampToValueAtTime(0.13, now + 1.5);
-
-  clearTimeout(bgmChordTimerHandle);
-  scheduleNextChord();
-}
-
-function stopBgm() {
-  clearTimeout(bgmChordTimerHandle);
-  bgmChordTimerHandle = null;
-  // ドローンのオシレーター自体は止めず、マスターの音量だけをなめらかにフェードアウトさせる。
-  // こうしておくと、再びONにした時も音が途切れた感じにならず自然に再開できる。
-  if (audioCtx && bgmMasterGain) {
-    const now = audioCtx.currentTime;
-    bgmMasterGain.gain.cancelScheduledValues(now);
-    bgmMasterGain.gain.setValueAtTime(bgmMasterGain.gain.value, now);
-    bgmMasterGain.gain.linearRampToValueAtTime(0.0001, now + 1.2);
-  }
-}
-
-function setBgmEnabled(enabled) {
-  bgmEnabled = enabled;
-  saveBgmPreference(enabled);
-  updateBgmToggleButton();
-  if (enabled && bgmUnlocked) {
-    startBgm();
+  if (isCorrect) {
+    shikiState.correctCount += 1;
+    shikiState.streak += 1;
+    shikiState.bestStreak = Math.max(shikiState.bestStreak, shikiState.streak);
+    feedback.textContent = "正解！";
+    feedback.classList.add("is-correct-text");
   } else {
-    stopBgm();
+    shikiState.streak = 0;
+    recordShikiWeakPoint(q.explanationPattern.id);
+    const explanation = getExplanation(q.explanationPattern);
+    feedback.textContent = `不正解。正解は「${q.answer}」。${explanation.notes || ""}`;
+    feedback.classList.add("is-wrong-text");
+  }
+
+  document.getElementById("btn-shiki-next").classList.remove("is-hidden");
+}
+
+// 誤答した助動詞を記録しておく（苦手克服モードなど、将来の復習機能の土台）
+function recordShikiWeakPoint(patternId) {
+  const mod = playerData.modules.shikibetsu_quiz;
+  if (!mod.weakPoints) mod.weakPoints = {};
+  mod.weakPoints[patternId] = (mod.weakPoints[patternId] || 0) + 1;
+  savePlayerData();
+}
+
+function advanceShikiQuestion() {
+  shikiState.index += 1;
+  if (shikiState.index >= shikiState.questions.length) {
+    finishShikibetsuGame();
+  } else {
+    renderShikiQuestion();
   }
 }
 
-function updateBgmToggleButton() {
-  const btn = document.getElementById("btn-bgm-toggle");
-  if (!btn) return;
-  btn.textContent = bgmEnabled ? "♪ BGM ON" : "♪ BGM OFF";
-  btn.classList.toggle("is-off", !bgmEnabled);
-  btn.setAttribute("aria-pressed", bgmEnabled ? "true" : "false");
-}
+function finishShikibetsuGame() {
+  const mod = playerData.modules.shikibetsu_quiz;
+  mod.playCount += 1;
+  mod.correctCount = (mod.correctCount || 0) + shikiState.correctCount;
+  mod.totalAnswered = (mod.totalAnswered || 0) + shikiState.questions.length;
+  mod.bestStreak = Math.max(mod.bestStreak || 0, shikiState.bestStreak);
 
-// ブラウザの自動再生制限のため、最初のユーザー操作（タップ/クリック）をきっかけに
-// AudioContextを起動する（タイトル画面からの再生要件を満たすための実装上の工夫）
-function unlockBgmOnFirstInteraction() {
-  if (bgmUnlocked) return;
-  bgmUnlocked = true;
-  if (bgmEnabled) startBgm();
+  // EXP計算：1問正解ごとに基礎8点＋連続正解ボーナス(上限20)＋全問正解の完走ボーナス30点
+  const allCorrect = shikiState.correctCount === shikiState.questions.length;
+  const baseExp = shikiState.correctCount * 8;
+  const streakBonus = Math.min(shikiState.bestStreak * 2, 20);
+  const completeBonus = allCorrect ? 30 : 0;
+  const gainedExp = baseExp + streakBonus + completeBonus;
+  mod.earnedExp = (mod.earnedExp || 0) + gainedExp;
+
+  document.getElementById("shiki-result-correct").textContent = `${shikiState.correctCount} / ${shikiState.questions.length}`;
+  document.getElementById("shiki-result-streak").textContent = shikiState.bestStreak;
+  document.getElementById("shiki-result-exp").textContent = gainedExp;
+
+  savePlayerData();
+  awardExp(gainedExp); // レベルアップ／身分昇格が起きればbigModalQueueに積まれる（活用表パズルと共通の仕組み）
+  showScreen("screen-shikibetsu-result");
+  processBigModalQueue();
 }
 
 /* ------------------------------------------------------------------------
@@ -1771,32 +1810,20 @@ function init() {
   // ①②③ 新しい画面遷移：
   //   起動 → ブランドタイトル画面（常に最初に表示）
   //        → 「はじめる」を押す
-  //          → 未選択なら：キャラクター選択（初回のみ）→ 通常のタイトル画面（難易度選択）
-  //          → 選択済みなら：そのまま通常のタイトル画面（難易度選択）
+  //          → 未選択なら：キャラクター選択（初回のみ）→ 修行選択画面（活用表／識別）
+  //          → 選択済みなら：そのまま修行選択画面（活用表／識別）
   // キャラクター選択自体は「はじめる」を押した後に限り、未選択の場合だけスキップせず表示する。
   playerData = loadPlayerData();
   renderCharacterHud();
   showScreen("screen-brand-title");
 
-  spawnSakura();
-
-  // BGM：設定を読み込み、最初のユーザー操作で再生を解禁する（タイトル画面から再生・ゲーム中も継続）
-  bgmEnabled = loadBgmPreference();
-  updateBgmToggleButton();
-  document.addEventListener("pointerdown", unlockBgmOnFirstInteraction, { once: true });
-
-  const bgmToggleBtn = document.getElementById("btn-bgm-toggle");
-  if (bgmToggleBtn) {
-    bgmToggleBtn.addEventListener("click", () => {
-      setBgmEnabled(!bgmEnabled);
-    });
-  }
+  spawnInkMotes();
 
   // ブランドタイトル画面：「はじめる」ボタン
   const startBtn = document.getElementById("btn-start");
   if (startBtn) {
     startBtn.addEventListener("click", () => {
-      showScreen(playerData.characterType ? "screen-title" : "screen-character-select");
+      showScreen(playerData.characterType ? "screen-mode-select" : "screen-character-select");
     });
   }
 
@@ -1809,9 +1836,41 @@ function init() {
       playerData.characterType = characterType;
       savePlayerData();
       renderCharacterHud();
-      showScreen("screen-title");
+      showScreen("screen-mode-select");
     });
   });
+
+  // ⓪-b 修行選択画面：「活用表パズル」／「助動詞識別」
+  const modeButtons = document.querySelectorAll(".mode-btn");
+  modeButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const mode = btn.dataset.mode;
+      if (mode === "shikibetsu") {
+        showScreen("screen-shikibetsu-title");
+      } else {
+        showScreen("screen-title");
+      }
+    });
+  });
+
+  // 修行選択画面：「タイトルへ戻る」
+  const modeToBrandBtn = document.getElementById("btn-mode-to-brand");
+  if (modeToBrandBtn) {
+    modeToBrandBtn.addEventListener("click", () => {
+      showScreen("screen-brand-title");
+    });
+  }
+
+  // 修行選択画面：「データリセット」
+  const modeDataResetBtn = document.getElementById("btn-mode-data-reset");
+  if (modeDataResetBtn) {
+    modeDataResetBtn.addEventListener("click", () => {
+      const confirmed = window.confirm("すべてのセーブデータを削除します。本当によろしいですか？");
+      if (!confirmed) return;
+      resetPlayerData();
+      showScreen("screen-brand-title");
+    });
+  }
 
   // ② 難易度ボタン：初級／中級／上級のどれを押しても同じ流れでゲーム開始
   //    （タイトル非表示→ゲーム表示→盤面シャッフル生成→タイマー開始 は
@@ -1831,27 +1890,15 @@ function init() {
     });
   });
 
-  // 難易度選択画面：「タイトルへ戻る」（ブランドタイトル画面へ）
+  // 活用表パズル・難易度選択画面：「修行選択へ戻る」
   const titleToBrandBtn = document.getElementById("btn-title-to-brand");
   if (titleToBrandBtn) {
     titleToBrandBtn.addEventListener("click", () => {
-      showScreen("screen-brand-title");
+      showScreen("screen-mode-select");
     });
   }
 
-  // 難易度選択画面：「データリセット」
-  // 確認ダイアログでOKされた場合のみ、セーブデータを削除して初期状態に戻す
-  const dataResetBtn = document.getElementById("btn-data-reset");
-  if (dataResetBtn) {
-    dataResetBtn.addEventListener("click", () => {
-      const confirmed = window.confirm("すべてのセーブデータを削除します。本当によろしいですか？");
-      if (!confirmed) return;
-      resetPlayerData();
-      showScreen("screen-brand-title");
-    });
-  }
-
-  // タイトル画面（ブランド画面）：「データリセット」（難易度選択画面のものと同じ処理）
+  // タイトル画面（ブランド画面）：「データリセット」
   const brandDataResetBtn = document.getElementById("btn-brand-data-reset");
   if (brandDataResetBtn) {
     brandDataResetBtn.addEventListener("click", () => {
@@ -1859,6 +1906,51 @@ function init() {
       if (!confirmed) return;
       resetPlayerData();
       showScreen("screen-brand-title");
+    });
+  }
+
+  // 助動詞識別：難易度選択画面（→ そのままセット開始）
+  const shikiDiffButtons = document.querySelectorAll(".shiki-diff-btn");
+  shikiDiffButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const difficulty = btn.dataset.difficulty;
+      if (!difficulty) return;
+      startShikibetsuGame(difficulty);
+    });
+  });
+
+  const shikibetsuBackBtn = document.getElementById("btn-shikibetsu-back");
+  if (shikibetsuBackBtn) {
+    shikibetsuBackBtn.addEventListener("click", () => {
+      showScreen("screen-mode-select");
+    });
+  }
+
+  const shikibetsuQuitBtn = document.getElementById("btn-shikibetsu-quit");
+  if (shikibetsuQuitBtn) {
+    shikibetsuQuitBtn.addEventListener("click", () => {
+      showScreen("screen-mode-select");
+    });
+  }
+
+  const shikiNextBtn = document.getElementById("btn-shiki-next");
+  if (shikiNextBtn) {
+    shikiNextBtn.addEventListener("click", () => {
+      advanceShikiQuestion();
+    });
+  }
+
+  const shikiRetryBtn = document.getElementById("btn-shiki-retry");
+  if (shikiRetryBtn) {
+    shikiRetryBtn.addEventListener("click", () => {
+      startShikibetsuGame(shikiState.difficulty);
+    });
+  }
+
+  const shikiToTitleBtn = document.getElementById("btn-shiki-to-title");
+  if (shikiToTitleBtn) {
+    shikiToTitleBtn.addEventListener("click", () => {
+      showScreen("screen-mode-select");
     });
   }
 
