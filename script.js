@@ -417,6 +417,7 @@ const state = {
   elapsedSeconds: 0,
   isCleared: false,
   isModalOpen: false,     // 学習メモ／レベルアップ演出などを表示中はtrue（盤面操作・タイマーを止める）
+  hintLevel: 0,           // 初級限定ヒント機能のレベル（0=未使用／1=並び順バッジ／2以上=自動配置）
 };
 
 // レベルアップ・身分昇格・学習メモ（初級限定）の演出をまとめて管理するキュー。
@@ -620,6 +621,7 @@ function startGame(difficulty) {
   state.missCount = 0;
   state.totalSwapCount = 0;
   state.sessionComboExp = 0;
+  state.hintLevel = 0; // 初級限定ヒント機能：新しいゲームのたびにリセットする
   state.elapsedSeconds = 0;
   state.isCleared = false;
   state.isModalOpen = false;
@@ -640,6 +642,7 @@ function startGame(difficulty) {
   updateHUD();
   renderHintLegend();
   renderBoard();
+  updateHintButton();
   startTimer();
 }
 
@@ -657,6 +660,11 @@ function renderBoard() {
   board.classList.remove("hint-strong", "hint-weak", "hint-none");
   if (state.difficulty === "advanced") board.classList.add("hint-none");
   else board.classList.add("hint-strong");
+
+  // 初級のみ、列の並びを「右→左」にする（古文の活用表らしい見た目にし、
+  // 初学者が直感的に読みやすいようにする）。JS側のデータ構造やindexは一切変えず、
+  // CSSのdirection:rtlで見た目の並びだけを反転させている（.rtl-board参照）。
+  board.classList.toggle("rtl-board", state.difficulty === "beginner");
 
   // 列見出し（未然形〜命令形）は常時表示
   KEI_LABELS.forEach((label) => {
@@ -710,6 +718,16 @@ function renderBoard() {
 
     if (state.selectedIndex === index) {
       el.classList.add("is-selected");
+    }
+
+    // 初級ヒントLv1（並び順ヒント）：まだロックされていないマスに、
+    // 本来入るべき列番号（○番目）だけを示す小さなバッジを表示する。
+    // 文字そのものやマスの位置は変えない＝考える余地を残すヒント。
+    if (state.difficulty === "beginner" && state.hintLevel >= 1 && !cell.locked && !cell.isDummy) {
+      const badge = document.createElement("span");
+      badge.className = "hint-pos-badge";
+      badge.textContent = `${cell.correctCol + 1}`;
+      el.appendChild(badge);
     }
 
     board.appendChild(el);
@@ -954,6 +972,102 @@ function swapCells(indexA, indexB) {
 function checkGameClear() {
   if (state.lockedPatternIds.size >= state.selectedPatterns.length) {
     finishGame();
+  }
+}
+
+/* ------------------------------------------------------------------------
+   9. 初級限定ヒント機能（段階式）
+   Lv1：並び順ヒント……マスの文字・位置は変えず、「○番目」のバッジだけを表示する
+   Lv2・Lv3：一部のマスを、実際に正しい位置へ自動的に入れ替えて公開する
+   ヒントで動かしたマスは、プレイヤー自身の操作ではないため
+   ミス回数・総交換回数・コンボには一切影響させない（swapCellsとは別の関数を使う）。
+   ------------------------------------------------------------------------ */
+
+const HINT_MAX_LEVEL = 3;
+const HINT_REVEAL_COUNT_PER_LEVEL = 2; // Lv2・Lv3それぞれで自動公開するマス数
+
+// ヒントによる入れ替え専用。missCount / totalSwapCount / combo は変更しない。
+// 完成判定・クリア判定・演出キューは通常の交換と同じように処理する。
+function swapCellsForHint(indexA, indexB) {
+  const a = state.cells[indexA];
+  const b = state.cells[indexB];
+  if (a.locked || b.locked) return;
+
+  [state.cells[indexA], state.cells[indexB]] = [b, a];
+
+  const rowA = Math.floor(indexA / state.cols);
+  const rowB = Math.floor(indexB / state.cols);
+  const rowsToCheck = Array.from(new Set([rowA, rowB]));
+
+  const newlyCompleted = [];
+  rowsToCheck.forEach((row) => {
+    const pattern = checkRowCompletion(row);
+    if (pattern) newlyCompleted.push({ row, pattern });
+  });
+
+  if (newlyCompleted.length > 0) {
+    newlyCompleted.forEach(({ row, pattern }) => applyRowClear(row, pattern));
+  }
+
+  updateHUD();
+
+  if (newlyCompleted.length > 0) {
+    checkGameClear();
+    processBigModalQueue();
+  }
+}
+
+// まだ正しい位置に置かれていないマスを最大count個探し、正しい位置へ入れ替える
+function revealCorrectCells(count) {
+  let revealed = 0;
+  for (let i = 0; i < state.cells.length && revealed < count; i++) {
+    const cell = state.cells[i];
+    if (cell.locked || cell.isDummy) continue;
+
+    const targetIndex = cell.correctRow * state.cols + cell.correctCol;
+    if (targetIndex === i) continue; // すでに正しい位置にある
+    if (state.cells[targetIndex].locked) continue; // 交換先がロック済みなら諦めて次を探す
+
+    swapCellsForHint(i, targetIndex);
+    revealed += 1;
+  }
+}
+
+// 「ヒント」ボタン押下時の処理。押すたびにヒントレベルが上がり、支援内容が増える。
+function useHint() {
+  if (state.difficulty !== "beginner" || state.isCleared || state.isModalOpen) return;
+  if (state.hintLevel >= HINT_MAX_LEVEL) return;
+
+  state.hintLevel += 1;
+
+  if (state.hintLevel >= 2) {
+    // Lv2・Lv3：押すたびに数マスずつ、実際に正しい位置へ公開する
+    revealCorrectCells(HINT_REVEAL_COUNT_PER_LEVEL);
+  }
+  // Lv1は revealCorrectCells を呼ばない＝renderBoard() 側で
+  // 「○番目」バッジを表示するだけに留める（案2：並び順ヒント）。
+
+  renderBoard();
+  updateHintButton();
+}
+
+function updateHintButton() {
+  const btn = document.getElementById("btn-hint");
+  if (!btn) return;
+
+  if (state.difficulty !== "beginner") {
+    btn.classList.add("is-hidden");
+    return;
+  }
+  btn.classList.remove("is-hidden");
+
+  if (state.hintLevel >= HINT_MAX_LEVEL) {
+    btn.disabled = true;
+    btn.textContent = "ヒント（使い切りました）";
+  } else {
+    const nextLabels = ["並び順を見る", "一部を公開する", "さらに公開する"];
+    btn.disabled = false;
+    btn.textContent = `ヒント：${nextLabels[state.hintLevel]}`;
   }
 }
 
@@ -1379,6 +1493,147 @@ function spawnSakura() {
 }
 
 /* ------------------------------------------------------------------------
+   11-b. BGM（お琴風・生成型アンビエントBGM）
+   実際の音声ファイルは使わず、Web Audio APIで和風の五音音階（陽旋法）を
+   ゆったりと爪弾くような音を、ランダムなタイミングで鳴らし続ける。
+   勉強・パズルの邪魔にならないよう、音量は控えめ・間隔もゆったりにしてある。
+   ------------------------------------------------------------------------ */
+
+const BGM_PREF_KEY = "miyabi-run-bgm-v1";
+let audioCtx = null;
+let bgmMasterGain = null;
+let bgmEnabled = true;
+let bgmTimerHandle = null;
+let bgmUnlocked = false; // ブラウザの自動再生制限のため、最初のユーザー操作まで実際の再生は待つ
+
+// 陽旋法（お琴などでよく使われる五音音階）の音程。ルート音からの半音差で表す。
+const KOTO_SCALE_INTERVALS = [0, 2, 5, 7, 9];
+const KOTO_ROOT_HZ = 293.66; // D4を基準にする
+
+function loadBgmPreference() {
+  try {
+    const saved = localStorage.getItem(BGM_PREF_KEY);
+    return saved === null ? true : saved === "on"; // 未設定時はデフォルトON
+  } catch (e) {
+    return true;
+  }
+}
+
+function saveBgmPreference(enabled) {
+  try {
+    localStorage.setItem(BGM_PREF_KEY, enabled ? "on" : "off");
+  } catch (e) {
+    console.error("[雅ラン] BGM設定の保存に失敗しました。", e);
+  }
+}
+
+function ensureAudioContext() {
+  if (audioCtx) return audioCtx;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null; // 対応していないブラウザでは何もしない
+  audioCtx = new Ctx();
+  bgmMasterGain = audioCtx.createGain();
+  bgmMasterGain.gain.value = 0.16; // 学習の邪魔にならない、控えめな音量
+  bgmMasterGain.connect(audioCtx.destination);
+  return audioCtx;
+}
+
+// お琴の爪弾き1音分を合成する（速いアタック＋ゆっくりとした減衰）
+function pluckKotoNote(freq, startTime, duration, velocity) {
+  if (!audioCtx || !bgmMasterGain) return;
+
+  const osc = audioCtx.createOscillator();
+  osc.type = "triangle";
+  osc.frequency.value = freq;
+
+  // わずかにデチューンした音を重ね、和楽器らしい響きの厚みを出す
+  const osc2 = audioCtx.createOscillator();
+  osc2.type = "sine";
+  osc2.frequency.value = freq * 2.003;
+
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = 2400;
+
+  const gain = audioCtx.createGain();
+  const peak = 0.5 * velocity;
+  gain.gain.setValueAtTime(0.0001, startTime);
+  gain.gain.exponentialRampToValueAtTime(peak, startTime + 0.012); // 爪弾きの速いアタック
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration); // ゆっくり減衰
+
+  osc.connect(filter);
+  osc2.connect(filter);
+  filter.connect(gain);
+  gain.connect(bgmMasterGain);
+
+  osc.start(startTime);
+  osc2.start(startTime);
+  osc.stop(startTime + duration + 0.1);
+  osc2.stop(startTime + duration + 0.1);
+}
+
+function scheduleNextBgmNote() {
+  if (!bgmEnabled || !audioCtx) return;
+
+  const now = audioCtx.currentTime;
+  const octaveShift = Math.random() < 0.3 ? 12 : 0; // たまに1オクターブ上の音も混ぜる
+  const interval = KOTO_SCALE_INTERVALS[Math.floor(Math.random() * KOTO_SCALE_INTERVALS.length)];
+  const freq = KOTO_ROOT_HZ * Math.pow(2, (interval + octaveShift) / 12);
+  const velocity = 0.6 + Math.random() * 0.4;
+  pluckKotoNote(freq, now + 0.05, 2.0 + Math.random() * 1.5, velocity);
+
+  // ときどき、続けてもう1音を重ねて短いフレーズにする
+  if (Math.random() < 0.35) {
+    const interval2 = KOTO_SCALE_INTERVALS[Math.floor(Math.random() * KOTO_SCALE_INTERVALS.length)];
+    const freq2 = KOTO_ROOT_HZ * Math.pow(2, interval2 / 12);
+    pluckKotoNote(freq2, now + 0.45, 1.6, velocity * 0.75);
+  }
+
+  const nextDelayMs = 1800 + Math.random() * 2400; // 1.8〜4.2秒間隔でゆったりと鳴らす
+  bgmTimerHandle = setTimeout(scheduleNextBgmNote, nextDelayMs);
+}
+
+function startBgm() {
+  const ctx = ensureAudioContext();
+  if (!ctx) return;
+  if (ctx.state === "suspended") ctx.resume();
+  clearTimeout(bgmTimerHandle);
+  scheduleNextBgmNote();
+}
+
+function stopBgm() {
+  clearTimeout(bgmTimerHandle);
+  bgmTimerHandle = null;
+}
+
+function setBgmEnabled(enabled) {
+  bgmEnabled = enabled;
+  saveBgmPreference(enabled);
+  updateBgmToggleButton();
+  if (enabled && bgmUnlocked) {
+    startBgm();
+  } else {
+    stopBgm();
+  }
+}
+
+function updateBgmToggleButton() {
+  const btn = document.getElementById("btn-bgm-toggle");
+  if (!btn) return;
+  btn.textContent = bgmEnabled ? "♪ BGM ON" : "♪ BGM OFF";
+  btn.classList.toggle("is-off", !bgmEnabled);
+  btn.setAttribute("aria-pressed", bgmEnabled ? "true" : "false");
+}
+
+// ブラウザの自動再生制限のため、最初のユーザー操作（タップ/クリック）をきっかけに
+// AudioContextを起動する（タイトル画面からの再生要件を満たすための実装上の工夫）
+function unlockBgmOnFirstInteraction() {
+  if (bgmUnlocked) return;
+  bgmUnlocked = true;
+  if (bgmEnabled) startBgm();
+}
+
+/* ------------------------------------------------------------------------
    12. 初期化・イベント登録
    ------------------------------------------------------------------------ */
 
@@ -1394,6 +1649,18 @@ function init() {
   showScreen("screen-brand-title");
 
   spawnSakura();
+
+  // BGM：設定を読み込み、最初のユーザー操作で再生を解禁する（タイトル画面から再生・ゲーム中も継続）
+  bgmEnabled = loadBgmPreference();
+  updateBgmToggleButton();
+  document.addEventListener("pointerdown", unlockBgmOnFirstInteraction, { once: true });
+
+  const bgmToggleBtn = document.getElementById("btn-bgm-toggle");
+  if (bgmToggleBtn) {
+    bgmToggleBtn.addEventListener("click", () => {
+      setBgmEnabled(!bgmEnabled);
+    });
+  }
 
   // ブランドタイトル画面：「はじめる」ボタン
   const startBtn = document.getElementById("btn-start");
@@ -1451,6 +1718,14 @@ function init() {
       if (!confirmed) return;
       resetPlayerData();
       showScreen("screen-brand-title");
+    });
+  }
+
+  // 初級限定ヒントボタン
+  const hintBtn = document.getElementById("btn-hint");
+  if (hintBtn) {
+    hintBtn.addEventListener("click", () => {
+      useHint();
     });
   }
 

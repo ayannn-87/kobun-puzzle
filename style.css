@@ -134,6 +134,27 @@ button{ font-family: inherit; }
   z-index: 1;
 }
 
+/* BGM ON/OFF切り替えボタン：常に左下固定。
+   キャラクターHUD（右上／モバイルでは上部帯）とは反対側に置き、絶対に重ならないようにする。 */
+.bgm-toggle-btn{
+  position: fixed;
+  z-index: 15;
+  left: 12px;
+  bottom: 12px;
+  font-family: "Shippori Mincho", serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  color: var(--washi);
+  background: rgba(20,11,34,0.62);
+  border: 1px solid rgba(227,200,120,0.5);
+  border-radius: 999px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.bgm-toggle-btn:hover{ background: rgba(227,200,120,0.2); }
+.bgm-toggle-btn.is-off{ opacity: 0.6; }
+
 .petal{
   position:absolute;
   top:-5vh;
@@ -416,7 +437,47 @@ button{ font-family: inherit; }
   color: var(--washi);
 }
 .hint-legend.is-hidden{ display:none; }
-.legend-item{ display:flex; align-items:center; gap: 5px; }
+
+/* 初級限定ヒントボタン */
+.hint-btn{
+  display: block;
+  margin: 10px auto 0;
+}
+.hint-btn.is-hidden{ display: none; }
+.hint-btn:disabled{
+  opacity: 0.55;
+  cursor: default;
+}
+.hint-btn:disabled:hover{ background: rgba(255,255,255,0.04); }
+
+/* ヒントLv1：マスに表示する「○番目」バッジ */
+.hint-pos-badge{
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--ink);
+  font-family: "Shippori Mincho", serif;
+  font-size: 0.58rem;
+  line-height: 1.5;
+  text-align: center;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.6);
+  pointer-events: none;
+}
+
+/* 初級のみ：列を「右→左」に表示する（古文の活用表らしい見た目にする）。
+   JS側のデータやインデックスは変えず、direction:rtlで見た目の並びだけを反転させる。
+   マス・列見出しの中身（文字）はdirection:ltrに戻し、文字自体は正しい向きで表示する。 */
+.board.rtl-board{
+  direction: rtl;
+}
+.board.rtl-board .cell,
+.board.rtl-board .col-head{
+  direction: ltr;
+}.legend-item{ display:flex; align-items:center; gap: 5px; }
 .legend-dot{ width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 4px currentColor; }
 
 /* ==========================================================================
@@ -936,6 +997,18 @@ button{ font-family: inherit; }
   .character-bubble{ right: 50%; transform: translate(50%, -4px); max-width: 78vw; }
   .character-bubble.is-show{ transform: translate(50%, 0); }
   .character-bubble::before{ right: 50%; transform: translate(50%, 0) rotate(45deg); }
+
+  /* 不具合修正：スマホでは常時表示キャラクターHUDが画面幅いっぱいに固定表示されるため、
+     何もしないと各画面の先頭コンテンツ（「← タイトル」「タイトルへ戻る」ボタン等）に
+     HUDが重なり、タップできなくなっていた。
+     HUDの実測高さ（ポートレート54px＋上下padding16px＋border等）より十分に大きい
+     104pxを、スマホ表示時は全画面共通で上部に確保し、絶対に重ならないようにする。 */
+  .screen{
+    padding-top: 104px;
+  }
+  #screen-game{
+    padding-top: 104px;
+  }
 }
 
 /* ==========================================================================

@@ -21,6 +21,9 @@
 </div>
 <div id="sakura-layer" aria-hidden="true"></div>
 
+<!-- BGM ON/OFF切り替え（どの画面でも操作できるよう常時表示。左下固定でキャラクターHUDとは重ならない位置） -->
+<button id="btn-bgm-toggle" class="bgm-toggle-btn" type="button" aria-pressed="true">♪ BGM ON</button>
+
 <!-- ============================== -->
 <!-- キャラクター常時表示HUD（タイトル画面・ゲーム画面で表示。JS側で表示/非表示を切替） -->
 <!-- ============================== -->
@@ -156,6 +159,9 @@
     </div>
 
     <p id="toast" class="toast" aria-live="polite"></p>
+
+    <!-- 初級限定ヒントボタン（段階式：1回目=並び順、2〜3回目=一部を自動公開） -->
+    <button id="btn-hint" class="ghost-btn hint-btn is-hidden">ヒント：並び順を見る</button>
   </section>
 
   <!-- ============================== -->
