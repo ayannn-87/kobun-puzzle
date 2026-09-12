@@ -313,7 +313,7 @@ function createDefaultModules() {
       correctCount: 0,
       totalAnswered: 0,
       bestStreak: 0,
-      weakPoints: {}, // { patternId: 誤答回数 }（苦手克服の土台。将来の復習モードで利用する想定）
+      weakPoints: {}, // { format: [patternId, ...] }（「修練の間」：正解すると自動的に外れる）
     },
     tango_quiz:      { moduleId: "tango_quiz",      displayName: "古文単語クイズ",   status: "locked",    playCount: 0, bestRank: null, earnedExp: 0 },
     bungakushi_quiz: { moduleId: "bungakushi_quiz", displayName: "文学史クイズ",     status: "locked",    playCount: 0, bestRank: null, earnedExp: 0 },
@@ -557,6 +557,22 @@ function showScreen(activeId) {
   if (activeId === "screen-brand-title" || activeId === "screen-title" || activeId === "screen-game") {
     clearCompletionMessage();
   }
+
+  // 助動詞識別の出題形式選択画面を開くたびに、「修練の間」の件数・表示/非表示を最新化する
+  if (activeId === "screen-shikibetsu-title") {
+    renderShikiReviewButtons();
+  }
+}
+
+// 「修練の間」ボタンの表示を、現在の苦手登録状況に合わせて更新する
+function renderShikiReviewButtons() {
+  document.querySelectorAll(".shiki-review-btn").forEach((btn) => {
+    const format = btn.dataset.format;
+    const count = getWeakPatternIds(format).length;
+    const countEl = btn.querySelector(".shiki-review-count");
+    if (countEl) countEl.textContent = `${count}問`;
+    btn.classList.toggle("is-hidden", count === 0);
+  });
 }
 
 // ---------------------------------------------------------------------
@@ -1222,6 +1238,12 @@ const REACTION_LINES = {
   kokushi: ["見事だ", "この調子で参ろう", "学びの成果が現れているな"],
 };
 
+// 誤答時の励ましセリフ（識別ゲーム用）。落ち込ませず、次に向かわせる言葉にする。
+const ENCOURAGE_LINES = {
+  hime: ["おしい……もう一歩ですわ", "焦らず、ゆっくり参りましょう", "次はきっと分かりますわ"],
+  kokushi: ["惜しい。次で取り返そう", "焦らず一歩ずつだ", "次はきっと分かるはずだ"],
+};
+
 let reactionTimeoutHandle = null;
 let expressionTimeoutHandle = null;
 
@@ -1301,6 +1323,31 @@ function showCharacterReaction() {
     if (bubble) bubble.classList.remove("is-show");
     const portrait = document.getElementById("character-portrait");
     if (portrait && portrait.dataset.expression === "happy") {
+      portrait.dataset.expression = "normal";
+    }
+  }, 2500);
+}
+
+// 誤答時：吹き出しで励ましのセリフを表示し、表情を少し困り顔にする（識別ゲーム用）
+function showCharacterEncouragement() {
+  const type = playerData.characterType;
+  if (!type) return;
+
+  const lines = ENCOURAGE_LINES[type] || ENCOURAGE_LINES.hime;
+  const line = lines[Math.floor(Math.random() * lines.length)];
+
+  const bubble = document.getElementById("character-bubble");
+  if (bubble) {
+    bubble.textContent = line;
+    bubble.classList.add("is-show");
+  }
+
+  setExpression("troubled", 0);
+  clearTimeout(reactionTimeoutHandle);
+  reactionTimeoutHandle = setTimeout(() => {
+    if (bubble) bubble.classList.remove("is-show");
+    const portrait = document.getElementById("character-portrait");
+    if (portrait && portrait.dataset.expression === "troubled") {
       portrait.dataset.expression = "normal";
     }
   }, 2500);
@@ -1570,19 +1617,16 @@ function spawnInkMotes() {
    活用表パズルと完全に共通化される。
    ------------------------------------------------------------------------ */
 
-const SHIKI_QUESTIONS_PER_SET = { beginner: 5, intermediate: 7, advanced: 8 };
-
-// 難易度ごとに、出題する形式（プロンプトの種類）の候補プール。
-// name=①助動詞名を選ぶ／meaning=②意味を選ぶ／katsuyokei=③活用形を選ぶ／
-// context-hint=④文中識別(対象語のヒントあり)／context=④文中識別(ヒントなし)
-const SHIKI_FORMAT_POOL = {
-  beginner: ["name", "meaning"],
-  intermediate: ["katsuyokei", "context-hint"],
-  advanced: ["context", "katsuyokei", "meaning"],
+// 出題形式ごとの設定（難易度ではなく「何を答えるか」で選ぶ方式に変更）
+const SHIKI_FORMATS = {
+  katsuyokei: { label: "活用形を選ぶ", desc: "「これは何形？」を4択で答える", questionCount: 8 },
+  meaning: { label: "意味を選ぶ", desc: "助動詞の意味を4択で答える", questionCount: 8 },
+  context: { label: "文中識別", desc: "例文中の助動詞の意味を、下線部に注目して答える", questionCount: 8 },
 };
 
 const shikiState = {
-  difficulty: "beginner",
+  format: "katsuyokei",
+  isReview: false, // 「修練の間」（苦手克服）からの出題かどうか
   questions: [],
   index: 0,
   correctCount: 0,
@@ -1590,6 +1634,11 @@ const shikiState = {
   bestStreak: 0,
   awaitingNext: false,
 };
+
+// 一部の記号をエスケープする（下線付き例文をinnerHTMLで組み立てるため）
+function escapeHtml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
 
 // 「「き」」のように括弧書きされたパターン名から、括弧の中身だけを取り出す
 function extractWordFromPatternName(name) {
@@ -1602,47 +1651,39 @@ function pickDistractors(pool, excludeValue, count) {
   return shuffleArray(uniquePool).slice(0, count);
 }
 
-// 全パターンの「意味」を集めたプール（自分自身の意味を除いた分だけを誤答選択肢に使う）
-function collectAllMeanings(excludePatternId) {
+// 全パターンの「意味」を集めたプール。
+// excludePatternId で出題対象そのものを除外するのに加え、excludeMeaningsSet に
+// 含まれる意味（＝多義的な助動詞が実際に持っている意味すべて）も除外する。
+// これにより、他の助動詞から借りた誤答の選択肢が「実は出題対象にも当てはまる
+// 正しい意味だった」という、多義語特有の答えが割れる不具合を防ぐ。
+function collectAllMeanings(excludePatternId, excludeMeaningsSet) {
   const pool = [];
   PATTERN_SOURCE.forEach((p) => {
     if (p.id === excludePatternId) return;
     getExplanation(p).meanings.forEach((m) => {
-      if (!m.startsWith("（")) pool.push(m); // 「（動詞の活用例）」のような注記は除外する
+      if (!m.startsWith("（") && !excludeMeaningsSet.has(m)) pool.push(m);
     });
   });
   return pool;
 }
 
-// 指定した形式(format)の問題を1問、既存データから動的に生成する
-function generateShikiQuestion(format) {
-  const pattern = PATTERN_SOURCE[Math.floor(Math.random() * PATTERN_SOURCE.length)];
+// 指定した形式(format)の問題を1問、既存データから動的に生成する。
+// patternOverride を渡すと、その助動詞に固定して出題する（「修練の間」の復習用）。
+function generateShikiQuestion(format, patternOverride) {
+  const pattern = patternOverride || PATTERN_SOURCE[Math.floor(Math.random() * PATTERN_SOURCE.length)];
   const explanation = getExplanation(pattern);
   const wordOnly = extractWordFromPatternName(pattern.name);
 
-  if (format === "name") {
-    const validForms = Array.from(new Set(pattern.forms.filter((f) => f !== "○")));
-    const word = validForms[Math.floor(Math.random() * validForms.length)];
-    const otherNames = pickDistractors(PATTERN_SOURCE.map((p) => p.name), pattern.name, 3);
-    return {
-      format,
-      formatLabel: "助動詞名を選ぶ",
-      prompt: `「${word}」`,
-      question: "これは、どの助動詞の活用形？",
-      choices: shuffleArray([pattern.name, ...otherNames]),
-      answer: pattern.name,
-      explanationPattern: pattern,
-    };
-  }
-
   if (format === "meaning") {
     const meanings = explanation.meanings.filter((m) => !m.startsWith("（"));
-    if (meanings.length === 0) return generateShikiQuestion("name"); // 意味を持たないデータ（動詞活用例）は代替
+    if (meanings.length === 0) return generateShikiQuestion("katsuyokei", pattern); // 意味を持たない場合は活用形問題で代替
+    const meaningsSet = new Set(meanings); // 多義的な助動詞の場合、正しい意味すべてを誤答候補から除外する
     const correctMeaning = meanings[Math.floor(Math.random() * meanings.length)];
-    const distractors = pickDistractors(collectAllMeanings(pattern.id), correctMeaning, 3);
+    const distractors = pickDistractors(collectAllMeanings(pattern.id, meaningsSet), correctMeaning, 3);
     return {
       format,
-      formatLabel: "意味を選ぶ",
+      patternId: pattern.id,
+      formatLabel: SHIKI_FORMATS.meaning.label,
       prompt: `「${wordOnly}」`,
       question: "この助動詞の意味として正しいものは？",
       choices: shuffleArray([correctMeaning, ...distractors]),
@@ -1661,12 +1702,13 @@ function generateShikiQuestion(format) {
     const validCols = pattern.forms
       .map((f, i) => (f !== "○" && formCounts[f] === 1 ? i : -1))
       .filter((i) => i !== -1);
-    if (validCols.length === 0) return generateShikiQuestion("meaning"); // 一意に定まる形が無ければ意味当てで代替
+    if (validCols.length === 0) return generateShikiQuestion("meaning", pattern); // 一意に定まる形が無ければ意味当てで代替
     const col = validCols[Math.floor(Math.random() * validCols.length)];
     const word = pattern.forms[col];
     return {
       format,
-      formatLabel: "活用形を選ぶ",
+      patternId: pattern.id,
+      formatLabel: SHIKI_FORMATS.katsuyokei.label,
       prompt: `「${word}」（${wordOnly}）`,
       question: "これは何形？",
       choices: shuffleArray(KEI_LABELS.slice()),
@@ -1675,41 +1717,86 @@ function generateShikiQuestion(format) {
     };
   }
 
-  if (format === "context" || format === "context-hint") {
+  if (format === "context") {
     const example = explanation.examples && explanation.examples[0];
-    if (!example) return generateShikiQuestion("meaning"); // 例文が無ければ意味当てで代替
+    if (!example) return generateShikiQuestion("meaning", pattern); // 例文が無ければ意味当てで代替
     const meanings = explanation.meanings.filter((m) => !m.startsWith("（"));
+    const meaningsSet = new Set(meanings);
     const correctMeaning = meanings[0] || explanation.meanings[0];
-    const distractors = pickDistractors(collectAllMeanings(pattern.id), correctMeaning, 3);
-    const hintNote = format === "context-hint" ? `（「${wordOnly}」の働きに注目）` : "";
+    const distractors = pickDistractors(collectAllMeanings(pattern.id, meaningsSet), correctMeaning, 3);
+
+    // 識別対象の語に下線を引く（見つからない場合は下線なしでそのまま表示する）
+    const idx = example.sentence.indexOf(wordOnly);
+    const promptHtml =
+      idx >= 0
+        ? `${escapeHtml(example.sentence.slice(0, idx))}<u class="shiki-target">${escapeHtml(wordOnly)}</u>${escapeHtml(example.sentence.slice(idx + wordOnly.length))}`
+        : escapeHtml(example.sentence);
+
     return {
       format,
-      formatLabel: "文中識別",
-      prompt: example.sentence,
-      question: `文中の助動詞の意味として正しいものは？${hintNote}`,
+      patternId: pattern.id,
+      formatLabel: SHIKI_FORMATS.context.label,
+      promptHtml,
+      question: "下線部の助動詞の意味として正しいものは？",
       choices: shuffleArray([correctMeaning, ...distractors]),
       answer: correctMeaning,
       explanationPattern: pattern,
+      translation: example.note || "",
     };
   }
 
-  return generateShikiQuestion("name"); // 未知のformatに対するフォールバック
+  return generateShikiQuestion("katsuyokei", pattern); // 未知のformatに対するフォールバック
 }
 
-function buildShikiQuestionSet(difficulty) {
-  const count = SHIKI_QUESTIONS_PER_SET[difficulty] || SHIKI_QUESTIONS_PER_SET.beginner;
-  const formats = SHIKI_FORMAT_POOL[difficulty] || SHIKI_FORMAT_POOL.beginner;
+/* ------------------------------------------------------------------------
+   「修練の間」：識別ゲームで間違えた助動詞を、出題形式ごとに記録・復習する仕組み。
+   正解すると自動的にリストから外れる（覚え直したとみなす）。
+   ------------------------------------------------------------------------ */
+function getWeakPatternIds(format) {
+  const mod = playerData.modules.shikibetsu_quiz;
+  if (!mod.weakPoints) mod.weakPoints = {};
+  return mod.weakPoints[format] ? mod.weakPoints[format].slice() : [];
+}
+
+function addWeakPoint(format, patternId) {
+  const mod = playerData.modules.shikibetsu_quiz;
+  if (!mod.weakPoints) mod.weakPoints = {};
+  if (!mod.weakPoints[format]) mod.weakPoints[format] = [];
+  if (!mod.weakPoints[format].includes(patternId)) {
+    mod.weakPoints[format].push(patternId);
+  }
+  savePlayerData();
+}
+
+function removeWeakPoint(format, patternId) {
+  const mod = playerData.modules.shikibetsu_quiz;
+  if (!mod.weakPoints || !mod.weakPoints[format]) return;
+  mod.weakPoints[format] = mod.weakPoints[format].filter((id) => id !== patternId);
+  savePlayerData();
+}
+
+function buildShikiQuestionSet(format, reviewPatternIds) {
+  if (reviewPatternIds && reviewPatternIds.length > 0) {
+    // 「修練の間」：苦手として記録されている助動詞だけを、その分だけ出題する
+    return reviewPatternIds.map((pid) => {
+      const pattern = PATTERN_SOURCE.find((p) => p.id === pid);
+      return generateShikiQuestion(format, pattern || undefined);
+    });
+  }
+  const count = (SHIKI_FORMATS[format] && SHIKI_FORMATS[format].questionCount) || 8;
   const questions = [];
   for (let i = 0; i < count; i++) {
-    const format = formats[Math.floor(Math.random() * formats.length)];
     questions.push(generateShikiQuestion(format));
   }
   return questions;
 }
 
-function startShikibetsuGame(difficulty) {
-  shikiState.difficulty = difficulty;
-  shikiState.questions = buildShikiQuestionSet(difficulty);
+function startShikibetsuGame(format, isReview) {
+  shikiState.format = format;
+  shikiState.isReview = !!isReview;
+  const reviewIds = isReview ? getWeakPatternIds(format) : null;
+
+  shikiState.questions = buildShikiQuestionSet(format, reviewIds);
   shikiState.index = 0;
   shikiState.correctCount = 0;
   shikiState.streak = 0;
@@ -1725,8 +1812,14 @@ function renderShikiQuestion() {
   const q = shikiState.questions[shikiState.index];
   document.getElementById("shiki-qnum").textContent = shikiState.index + 1;
   document.getElementById("shiki-streak").textContent = shikiState.streak;
-  document.getElementById("shiki-format-label").textContent = q.formatLabel;
-  document.getElementById("shiki-prompt").textContent = q.prompt;
+  document.getElementById("shiki-format-label").textContent = shikiState.isReview ? `${q.formatLabel}（修練の間）` : q.formatLabel;
+
+  const promptEl = document.getElementById("shiki-prompt");
+  if (q.promptHtml) {
+    promptEl.innerHTML = q.promptHtml;
+  } else {
+    promptEl.textContent = q.prompt;
+  }
 
   const feedback = document.getElementById("shiki-feedback");
   feedback.textContent = "";
@@ -1776,23 +1869,20 @@ function onShikiChoiceSelected(choice, btnEl) {
     shikiState.bestStreak = Math.max(shikiState.bestStreak, shikiState.streak);
     feedback.textContent = "正解！";
     feedback.classList.add("is-correct-text");
+    removeWeakPoint(q.format, q.patternId); // 修練の間から自動的に外す
+    showCharacterReaction(); // 正解時：キャラクターが褒める
   } else {
     shikiState.streak = 0;
-    recordShikiWeakPoint(q.explanationPattern.id);
+    addWeakPoint(q.format, q.patternId); // 修練の間に登録する
     const explanation = getExplanation(q.explanationPattern);
-    feedback.textContent = `不正解。正解は「${q.answer}」。${explanation.notes || ""}`;
+    let message = `不正解。正解は「${q.answer}」。${explanation.notes || ""}`;
+    if (q.translation) message += `　現代語訳：${q.translation}`;
+    feedback.textContent = message;
     feedback.classList.add("is-wrong-text");
+    showCharacterEncouragement(); // 誤答時：キャラクターが励ます
   }
 
   document.getElementById("btn-shiki-next").classList.remove("is-hidden");
-}
-
-// 誤答した助動詞を記録しておく（苦手克服モードなど、将来の復習機能の土台）
-function recordShikiWeakPoint(patternId) {
-  const mod = playerData.modules.shikibetsu_quiz;
-  if (!mod.weakPoints) mod.weakPoints = {};
-  mod.weakPoints[patternId] = (mod.weakPoints[patternId] || 0) + 1;
-  savePlayerData();
 }
 
 function advanceShikiQuestion() {
@@ -1936,13 +2026,23 @@ function init() {
     });
   }
 
-  // 助動詞識別：難易度選択画面（→ そのままセット開始）
+  // 助動詞識別：出題形式の選択画面（→ そのままセット開始）
   const shikiDiffButtons = document.querySelectorAll(".shiki-diff-btn");
   shikiDiffButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
-      const difficulty = btn.dataset.difficulty;
-      if (!difficulty) return;
-      startShikibetsuGame(difficulty);
+      const format = btn.dataset.format;
+      if (!format) return;
+      startShikibetsuGame(format, false);
+    });
+  });
+
+  // 「修練の間」：その形式で苦手登録されている助動詞だけを復習する
+  const shikiReviewButtons = document.querySelectorAll(".shiki-review-btn");
+  shikiReviewButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const format = btn.dataset.format;
+      if (!format) return;
+      startShikibetsuGame(format, true);
     });
   });
 
@@ -1957,14 +2057,6 @@ function init() {
   if (shikibetsuQuitBtn) {
     shikibetsuQuitBtn.addEventListener("click", () => {
       showScreen("screen-mode-select");
-    });
-  }
-
-  // 出題画面：「難易度選択へ戻る」（修行選択より1つ手前、同じ識別ゲームの難易度選び直しへ）
-  const shikibetsuGameToDiffBtn = document.getElementById("btn-shikibetsu-game-to-diff");
-  if (shikibetsuGameToDiffBtn) {
-    shikibetsuGameToDiffBtn.addEventListener("click", () => {
-      showScreen("screen-shikibetsu-title");
     });
   }
 

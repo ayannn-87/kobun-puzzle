@@ -19,7 +19,6 @@
   <div id="pillar-left"></div>
   <div id="pillar-right"></div>
   <div id="shoji-glow"></div>
-  <div id="scrolls"></div>
 </div>
 <div id="ink-layer" aria-hidden="true"></div>
 
@@ -143,7 +142,7 @@
         </button>
       </div>
 
-      <p class="rule-hint">マスをタップして2つ選ぶと入れ替わります。指で直接ドラッグしての入れ替えにも対応。</p>
+      <p class="rule-hint">マスをタップして2つ選ぶと入れ替わります。ドラッグでの入れ替えにも対応しています。左から右に活用が正しく並ぶように揃えましょう。</p>
 
       <div class="title-footer-actions">
         <button id="btn-title-to-brand" class="ghost-btn">修行選択へ戻る</button>
@@ -157,24 +156,41 @@
   <section id="screen-shikibetsu-title" class="screen">
     <div class="title-panel washi-panel">
       <p class="eyebrow">修行の間・助動詞識別</p>
-      <h2 class="mode-select-title">難易度を選ぶ</h2>
+      <h2 class="mode-select-title">何を答えますか？</h2>
 
-      <div class="difficulty-select">
-        <button class="shiki-diff-btn" data-difficulty="beginner">
-          <span class="diff-name">初級</span>
-          <span class="diff-desc">助動詞名・意味を答える（全5問）</span>
-        </button>
-        <button class="shiki-diff-btn" data-difficulty="intermediate">
-          <span class="diff-name">中級</span>
-          <span class="diff-desc">活用形・文中識別（ヒントあり／全7問）</span>
-        </button>
-        <button class="shiki-diff-btn" data-difficulty="advanced">
-          <span class="diff-name">上級</span>
-          <span class="diff-desc">文中識別（ヒントなし）中心（全8問）</span>
-        </button>
+      <div class="difficulty-select shiki-format-list">
+        <div class="shiki-format-group">
+          <button class="shiki-diff-btn" data-format="katsuyokei">
+            <span class="diff-name">活用形を選ぶ</span>
+            <span class="diff-desc">「これは何形？」を4択で答える（全8問）</span>
+          </button>
+          <button class="shiki-review-btn is-hidden" data-format="katsuyokei">
+            修練の間　<span class="shiki-review-count">0問</span>
+          </button>
+        </div>
+
+        <div class="shiki-format-group">
+          <button class="shiki-diff-btn" data-format="meaning">
+            <span class="diff-name">意味を選ぶ</span>
+            <span class="diff-desc">助動詞の意味を4択で答える（全8問）</span>
+          </button>
+          <button class="shiki-review-btn is-hidden" data-format="meaning">
+            修練の間　<span class="shiki-review-count">0問</span>
+          </button>
+        </div>
+
+        <div class="shiki-format-group">
+          <button class="shiki-diff-btn" data-format="context">
+            <span class="diff-name">文中識別</span>
+            <span class="diff-desc">例文中の下線部の意味を答える（全8問）</span>
+          </button>
+          <button class="shiki-review-btn is-hidden" data-format="context">
+            修練の間　<span class="shiki-review-count">0問</span>
+          </button>
+        </div>
       </div>
 
-      <p class="rule-hint">「ぬ」「なむ」「らむ・らる」など、紛らわしい識別の定番も出題されます。</p>
+      <p class="rule-hint">「ぬ」「なむ」「らむ・らる」など、紛らわしい識別の定番も出題されます。間違えた問題は「修練の間」に記録され、正解すると自動的に外れます。</p>
 
       <div class="title-footer-actions">
         <button id="btn-shikibetsu-back" class="ghost-btn">修行選択へ戻る</button>
@@ -207,10 +223,6 @@
       <p class="shiki-feedback" id="shiki-feedback"></p>
       <button id="btn-shiki-next" class="primary-btn is-hidden">次の問題へ</button>
     </div>
-
-    <div class="title-footer-actions">
-      <button id="btn-shikibetsu-game-to-diff" class="ghost-btn nav-btn">難易度選択へ戻る</button>
-    </div>
   </section>
 
   <!-- ============================== -->
@@ -237,7 +249,7 @@
       </dl>
 
       <div class="clear-buttons">
-        <button id="btn-shiki-result-to-diff" class="ghost-btn nav-btn">難易度選択へ戻る</button>
+        <button id="btn-shiki-result-to-diff" class="ghost-btn nav-btn">問題選択に戻る</button>
         <button id="btn-shiki-retry" class="primary-btn">もう1セット</button>
         <button id="btn-shiki-to-title" class="ghost-btn">修行選択へ戻る</button>
       </div>

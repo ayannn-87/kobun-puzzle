@@ -121,30 +121,6 @@ button{ font-family: inherit; }
   50%{ opacity: 1; }
 }
 
-/* 巻物：画面の隅に、学問所らしい小道具として控えめに配置する */
-#scrolls{
-  position:absolute;
-  bottom: 4%;
-  left: 3%;
-  width: clamp(50px, 8vw, 90px);
-  height: clamp(16px, 2.6vw, 26px);
-  background: linear-gradient(90deg, #d8c48f, #f0e2b8 50%, #d8c48f);
-  border-radius: 999px;
-  box-shadow: 0 3px 10px rgba(42,33,22,0.3), inset 0 0 0 1px rgba(122,46,52,0.4);
-  opacity: 0.7;
-}
-#scrolls::before, #scrolls::after{
-  content:"";
-  position:absolute;
-  top: -6px;
-  width: 10px;
-  height: calc(100% + 12px);
-  background: #6b5230;
-  border-radius: 4px;
-}
-#scrolls::before{ left: -4px; }
-#scrolls::after{ right: -4px; }
-
 /* ==========================================================================
    墨の粒子エフェクト（桜吹雪の代わり。控えめに漂う筆の飛沫）
    ========================================================================== */
@@ -1161,6 +1137,37 @@ button{ font-family: inherit; }
   letter-spacing: 0.2em;
   color: var(--vermillion);
   margin: 0 0 10px;
+}
+
+/* 出題形式の選択画面：各形式ボタンの下に「修練の間」ボタンをまとめる */
+.shiki-format-group{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.shiki-review-btn{
+  align-self: center;
+  font-family: "Shippori Mincho", serif;
+  font-size: 0.74rem;
+  color: var(--vermillion);
+  background: rgba(122,46,52,0.08);
+  border: 1px solid var(--vermillion);
+  border-radius: 999px;
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.shiki-review-btn:hover{ background: rgba(122,46,52,0.16); }
+.shiki-review-btn.is-hidden{ display: none; }
+
+/* 文中識別問題：識別対象の助動詞に下線を引いて目立たせる */
+.shiki-target{
+  text-decoration: underline;
+  text-decoration-color: var(--vermillion);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  font-weight: 700;
+  color: var(--vermillion);
 }
 
 .shiki-prompt{
