@@ -121,6 +121,70 @@ button{ font-family: inherit; }
   50%{ opacity: 1; }
 }
 
+/* 屏風（びょうぶ）：画面中央〜左側に、金の縁取りで仕切られた絵画調のパネルを薄く配置する。
+   主張しすぎないよう、かなり低い不透明度に抑える。 */
+#byobu{
+  position: absolute;
+  top: 8%;
+  left: 6%;
+  width: clamp(180px, 26vw, 360px);
+  height: 78%;
+  background:
+    linear-gradient(90deg, transparent 0%, transparent 32.5%, rgba(201,162,75,0.4) 32.5%, rgba(201,162,75,0.4) 33.5%, transparent 33.5%, transparent 65.5%, rgba(201,162,75,0.4) 65.5%, rgba(201,162,75,0.4) 66.5%, transparent 66.5%),
+    linear-gradient(180deg, rgba(62,92,70,0.12), rgba(92,74,55,0.1) 55%, rgba(122,46,52,0.08));
+  border: 1px solid rgba(201,162,75,0.3);
+  border-radius: 4px;
+  opacity: 0.5;
+}
+
+/* 御簾（みす）：画面左端に、竹ひごを思わせる縦縞と房飾りを配置する */
+#misu{
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: clamp(70px, 13vw, 170px);
+  height: 62%;
+  background:
+    repeating-linear-gradient(90deg, rgba(122,92,55,0.55) 0px, rgba(122,92,55,0.55) 2px, transparent 2px, transparent 8px),
+    linear-gradient(180deg, rgba(92,74,55,0.28), rgba(92,74,55,0.16) 85%, transparent);
+  border-bottom: 3px solid rgba(122,46,52,0.35);
+  opacity: 0.55;
+}
+#misu::after{
+  /* 御簾の下端に垂れる房飾り */
+  content: "";
+  position: absolute;
+  bottom: -14px;
+  left: 0;
+  right: 0;
+  height: 14px;
+  background-image: radial-gradient(circle, rgba(122,46,52,0.5) 2.5px, transparent 3px);
+  background-size: 16px 16px;
+  background-position: 4px 0;
+  opacity: 0.7;
+}
+
+/* 畳（たたみ）：画面下端に、畳縁を思わせる控えめな帯を配置する */
+#tatami-edge{
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: clamp(28px, 4vw, 46px);
+  background:
+    repeating-linear-gradient(90deg, rgba(92,74,55,0.22) 0px, rgba(92,74,55,0.22) 1px, transparent 1px, transparent 34px),
+    linear-gradient(0deg, rgba(122,46,52,0.18), transparent);
+  border-top: 2px solid rgba(122,46,52,0.3);
+  opacity: 0.6;
+}
+
+/* スマホでは装飾を大幅に控えめにし、可読性を最優先する */
+@media (max-width: 760px){
+  #byobu{ opacity: 0.22; width: 34vw; }
+  #misu{ opacity: 0.3; width: 20vw; height: 40%; }
+  #tatami-edge{ opacity: 0.35; height: 22px; }
+}
+
 /* ==========================================================================
    墨の粒子エフェクト（桜吹雪の代わり。控えめに漂う筆の飛沫）
    ========================================================================== */

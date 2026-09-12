@@ -1622,6 +1622,7 @@ const SHIKI_FORMATS = {
   katsuyokei: { label: "活用形を選ぶ", desc: "「これは何形？」を4択で答える", questionCount: 8 },
   meaning: { label: "意味を選ぶ", desc: "助動詞の意味を4択で答える", questionCount: 8 },
   context: { label: "文中識別", desc: "例文中の助動詞の意味を、下線部に注目して答える", questionCount: 8 },
+  connection: { label: "接続を選ぶ", desc: "助動詞名と意味から、正しい接続を4択で答える", questionCount: 8 },
 };
 
 const shikiState = {
@@ -1667,6 +1668,21 @@ function collectAllMeanings(excludePatternId, excludeMeaningsSet) {
   return pool;
 }
 
+// 表記が同じ助動詞（例：伝聞推定の「なり」と断定の「なり」のような同形異語）が
+// 複数のPATTERN_SOURCEエントリにまたがっている場合、それらすべての意味を合わせて集める。
+// 「意味を選ぶ」問題で、見た目の語だけでは区別がつかない別の助動詞の意味が
+// 誤って誤答選択肢に混ざる（＝実は両方とも正しい、という答えの割れ）のを防ぐために使う。
+function getMeaningsForSameWord(word) {
+  const meanings = new Set();
+  PATTERN_SOURCE.forEach((p) => {
+    if (extractWordFromPatternName(p.name) !== word) return;
+    getExplanation(p).meanings.forEach((m) => {
+      if (!m.startsWith("（")) meanings.add(m);
+    });
+  });
+  return meanings;
+}
+
 // 指定した形式(format)の問題を1問、既存データから動的に生成する。
 // patternOverride を渡すと、その助動詞に固定して出題する（「修練の間」の復習用）。
 function generateShikiQuestion(format, patternOverride) {
@@ -1677,7 +1693,7 @@ function generateShikiQuestion(format, patternOverride) {
   if (format === "meaning") {
     const meanings = explanation.meanings.filter((m) => !m.startsWith("（"));
     if (meanings.length === 0) return generateShikiQuestion("katsuyokei", pattern); // 意味を持たない場合は活用形問題で代替
-    const meaningsSet = new Set(meanings); // 多義的な助動詞の場合、正しい意味すべてを誤答候補から除外する
+    const meaningsSet = getMeaningsForSameWord(wordOnly); // 同じ表記の別助動詞（例：なり）の意味も含めて誤答候補から除外する
     const correctMeaning = meanings[Math.floor(Math.random() * meanings.length)];
     const distractors = pickDistractors(collectAllMeanings(pattern.id, meaningsSet), correctMeaning, 3);
     return {
@@ -1721,7 +1737,7 @@ function generateShikiQuestion(format, patternOverride) {
     const example = explanation.examples && explanation.examples[0];
     if (!example) return generateShikiQuestion("meaning", pattern); // 例文が無ければ意味当てで代替
     const meanings = explanation.meanings.filter((m) => !m.startsWith("（"));
-    const meaningsSet = new Set(meanings);
+    const meaningsSet = getMeaningsForSameWord(wordOnly);
     const correctMeaning = meanings[0] || explanation.meanings[0];
     const distractors = pickDistractors(collectAllMeanings(pattern.id, meaningsSet), correctMeaning, 3);
 
@@ -1742,6 +1758,31 @@ function generateShikiQuestion(format, patternOverride) {
       answer: correctMeaning,
       explanationPattern: pattern,
       translation: example.note || "",
+    };
+  }
+
+  if (format === "connection") {
+    const correctConnection = explanation.connection;
+    if (!correctConnection || correctConnection === "―") {
+      return generateShikiQuestion("katsuyokei", pattern); // 接続を持たない（動詞活用例など）場合は代替
+    }
+    const meaningsList = explanation.meanings.filter((m) => !m.startsWith("（"));
+    const pool = [];
+    PATTERN_SOURCE.forEach((p) => {
+      if (p.id === pattern.id) return;
+      const c = getExplanation(p).connection;
+      if (c && c !== "―") pool.push(c);
+    });
+    const distractors = pickDistractors(pool, correctConnection, 3);
+    return {
+      format,
+      patternId: pattern.id,
+      formatLabel: SHIKI_FORMATS.connection.label,
+      prompt: pattern.name,
+      question: `意味は「${meaningsList.join("・")}」。この助動詞の接続として正しいものは？`,
+      choices: shuffleArray([correctConnection, ...distractors]),
+      answer: correctConnection,
+      explanationPattern: pattern,
     };
   }
 
